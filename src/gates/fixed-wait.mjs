@@ -46,9 +46,19 @@ export default validateGate({
             // this gate shipped with were of that shape (caught by its own silent fixture).
             if (isDeclaration(code)) return;
 
-            // page.waitForTimeout(500) / cy.wait(500) — an unconditional sleep
+            // page.waitForTimeout(500) / cy.wait(500) — an unconditional sleep.
+            //
+            // ⚠️ THE POLL GUARD BELONGS ON THIS BRANCH TOO, and leaving it off was a sibling of a
+            // bug already fixed on the setTimeout branch. Found on a production suite:
+            //
+            //     while (!hit && Date.now() < deadline) {
+            //       await this.page.waitForTimeout(500);   <- flagged. It is the poll INTERVAL.
+            //       all = await this.rows();
+            //
+            // Identical shape, identical wrongness, different branch. Fixing one instance of a
+            // defect and not sweeping for its siblings is its own recurring failure.
             const sleep = code.match(/\b(?:waitForTimeout|cy\.wait)\s*\(\s*(\d{2,})\s*\)/);
-            if (sleep) {
+            if (sleep && !insidePollLoop(lines, i)) {
                 found.push({
                     line: i + 1,
                     message: `unconditional ${sleep[0].trim()} — waits on the clock, not on a signal`,

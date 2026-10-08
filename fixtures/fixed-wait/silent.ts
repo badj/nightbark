@@ -47,3 +47,18 @@ export async function pollTwice(check: () => boolean): Promise<void> {
     await new Promise((r) => setTimeout(r, 250));
   }
 }
+
+// ⚠️ A BOUNDED POLL USING waitForTimeout AS THE INTERVAL — the same shape as the setTimeout poll
+// above, on the OTHER branch of the gate. The guard was originally applied to only one of the two;
+// found on a production suite. Both shapes are fixtures now so neither branch can regress.
+export async function findRow(page: any, name: string, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = await page.$$('[role=row]');
+  let hit = rows.find((r: any) => r.name === name);
+  while (!hit && Date.now() < deadline) {
+    await page.waitForTimeout(500);
+    rows = await page.$$('[role=row]');
+    hit = rows.find((r: any) => r.name === name);
+  }
+  return hit;
+}

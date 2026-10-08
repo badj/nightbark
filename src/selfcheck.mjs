@@ -46,6 +46,17 @@ const SHAPES = [
         why: 'a work-item id in a company-internal traceability notation',
     },
     {
+        id: 'wiki-or-tracker-id-in-path',
+        // ⚠️ ADDED AFTER A REAL LEAK, BY ME, INTO THIS REPO'S OWN README. While documenting that the
+        // shared-identity gate had mistaken Confluence page ids for phone numbers, I pasted one of
+        // the actual ids as the example. ADR-0001 forbids exactly that, and the rules above did not
+        // catch it: `tracker-id-notation` only matches @ado_123456 / @[123456] NOTATION, not a bare
+        // digit run sitting in a URL path. A long number inside a wiki or tracker path is an
+        // identifier for somebody's internal page, so it is matched on SHAPE now.
+        re: /\/(?:pages|wiki|workitems|_workitems|browse|issues?)\/[\w+.%-]*\b\d{6,}\b/gi,
+        why: 'a long numeric id inside a wiki or tracker path — an identifier for somebody\'s internal page',
+    },
+    {
         id: 'bearer-token',
         re: /\b(?:ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{30,})\b/g,
         why: 'something shaped like a live credential',

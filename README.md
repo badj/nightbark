@@ -98,49 +98,50 @@ MIT © JJ (Jacob) Badenhorst
 
 ## Precision
 
-The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. Measured by hand-triaging
-every finding on targets the gates were not written against.
+The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. Every finding hand-triaged on
+targets the gates were not written against.
 
 | Target | Files read | Findings | True | Precision |
 | --- | --- | --- | --- | --- |
 | `testmart-parallel-demo` (Playwright) | 77 | 15 | 15 | 100% |
 | `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
 | `cypress-realworld-app` (Cypress) | 170 | 2 | 2 | 100% |
+| **a 217-file production suite** (Playwright + BDD) | 217 | 26 | 22 | **85%** |
 
-### What it took — six rounds of red/green, all six failures mine
+### The production suite is where it earned its keep
 
-| | What was wrong | Caught by |
+The three public targets are unusually *good* code — a deliberate demo, a careful personal suite, and
+a reference app. A mature suite under real delivery pressure found problems in the gates that none of
+them could:
+
+| Round | What the gate got wrong | Fix |
 | --- | --- | --- |
-| 1 | `waitForTimeout` matched inside a **string literal** | `silent` fixture, before any real code |
-| 2 | A `setTimeout` **function definition** read as a call | `silent` fixture |
-| 3 | A **React route component** whose sleep was deliberate app behaviour | first real audit |
-| 4 | A textbook **bounded poll** — the pattern the gate's own advice recommends | first real audit |
-| 5 | `nonexistent@example.com`, a **not-found probe**, read as a shared account | first real audit |
-| 6 | `serialised-suite` only matched configs *named* after a tool, so `e2e.config.ts` was invisible | `fires` fixture |
+| 7 | **Confluence page ids** read as phone numbers (`.../wiki/spaces/XX/pages/<10-digit id>/...`) across 19 files, plus an ADO plan pair and a doc filename — **9 false positives of 20** | strip URLs and paths before matching; require a phone literal to start `+`/`0` or carry separators |
+| 8 | **Boundary and wrong-locale probes** (`maxValid`, "too long", "non-NZ") reported as shared accounts | 4 more noise rules |
+| 9 | A pooled number quoted inside a **diagnostic message string** read as a usage | exclude matches inside long prose |
+| 10 | ⚠️ `waitForTimeout` used as a **poll interval** inside a `while` loop — *the same bug already fixed on the `setTimeout` branch*, left unfixed on this one | apply the poll guard to both branches; both shapes now fixtures |
 
-Flagging the remedy as the defect (4) and flagging correct app behaviour (3) are the two fastest
-ways to lose a reader permanently. Every shape above is now a permanent fixture, so none can return.
+Round 10 is the instructive one: a defect fixed in one place and not swept for its siblings. That is a
+recurring failure in its own right, and the only reason it surfaced is that a real suite polls in both
+styles where the toy repos poll in neither.
 
-### ⚠️ Honest gap
+### Gate verdicts after that pass
 
-`shared-test-identity` is **proven to fire and proven specific, but has caught nothing real yet.**
-Its fixtures pass and two classes of false positive have been eliminated from it — but no target so
-far actually shares an identity across specs. A gate with zero field findings is not yet validated
-in the field, and saying otherwise would be the exact self-deception this tool exists to catch.
+| Gate | Production precision | Status |
+| --- | --- | --- |
+| `fixed-wait` | **15/15** | solid |
+| `serialised-suite` | **7/7** | solid — and four findings cite a reason the suite's own notes record as superseded, which is precisely the question the gate asks |
+| `shared-test-identity` | ~1–2 of 4 | **demoted to `note`** and reframed as a question |
 
-⛔ **A claim I made here was WRONG and is retracted.** I wrote that the RealWorld App's
-`database-seed.json` was "mutated by the run it seeds". It is not: the seed is regenerated
-deliberately by `scripts/generateSeedData.ts`, and `prestart` copies seed to live. What I had
-actually seen was a `git status` showing the file modified after someone ran `yarn db:seed`. I
-inferred a defect from a dirty working tree — the same shape of mistake this tool is built to find,
-made while building it.
+### ⚠️ `shared-test-identity` is demoted, on evidence
 
-The real collision shape, verified, is better anyway and is the next gate: the RealWorld App's
-`vite.config.ts` carries
+12% precision on first contact, ~25% after six rounds of noise rules. Below the bar this project set
+itself, so it now reports as a `note` that asks a question rather than an `error` that declares a
+defect. Three populations are indistinguishable on the line — a **managed** pool handed out per worker
+behind a lock (correct), a **probe** value reused deliberately (coverage), and a **raw** hard-coded
+account (the defect) — and only the surrounding mechanism separates them.
 
-```js
-fileParallelism: false, // #1666: Run tests sequentially to avoid race conditions with shared database.json file.
-```
-
-**Parallelism surrendered repo-wide, with an upstream issue number attached.** That is the true cost
-of shared mutable state — not a flaky test, but permanently giving up concurrency.
+That is the second shape evidence has pushed from gate to agent, after vacuity. The one genuine
+finding is the design brief for that Irregular: a spare value **defined as a constant beside a pool it
+was not part of** — an allocator existed and this value sat outside it. *Shared **and** outside the
+allocator that exists* is a far sharper signal than *shared*.
