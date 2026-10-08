@@ -44,6 +44,24 @@ project and it was arrived at by experiment, not taste.
 **Moriarty** — the adversarial pass. Every finding an Irregular raises gets attacked before it is
 reported, because a confident wrong finding costs more trust than a missed one.
 
+## Usage
+
+```bash
+nightbark audit <path>                 # run the gates over a repo (read-only)
+nightbark audit <path> --gate <id>     # one gate
+nightbark audit <path> --sarif out.json  # SARIF 2.1.0 for CI annotation
+nightbark audit <path> --fail-on warning # exit policy: error (default) | warning | note | never
+nightbark selftest                     # prove every gate can fire, and is specific
+npm run selftest                       # the above, plus the output-format tests
+```
+
+**SARIF is the integration strategy, not an afterthought.** One serialiser buys GitHub Code Scanning
+annotations *on the pull-request diff*, Azure DevOps ingestion, and VS Code problem matchers — with
+no destination-specific code. See [INTEGRATIONS](docs/INTEGRATIONS.md).
+
+⚠️ `--fail-on` defaults to **`error`**, not `warning`. A tool whose first run reds somebody's
+pipeline gets removed from the pipeline; tighten it once the output has earned trust.
+
 ## Decisions
 
 The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing direction:

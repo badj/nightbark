@@ -1,5 +1,8 @@
 #!/usr/bin/env node
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { audit } from '../src/runner.mjs';
+import { toSarif } from '../src/report/sarif.mjs';
 import { selftest } from '../src/selftest.mjs';
 import { gates } from '../src/gates/index.mjs';
 
@@ -21,9 +24,24 @@ if (cmd === 'selftest') {
 }
 
 if (cmd === 'audit') {
-    const target = rest.find((a) => !a.startsWith('--')) ?? process.cwd();
+    const target = resolve(rest.find((a) => !a.startsWith('--')) ?? process.cwd());
     const only = flag('gate')?.split(',') ?? null;
     const { findings, filesRead, gatesRun } = audit(target, { only });
+
+    // ── SARIF ────────────────────────────────────────────────────────────────────────────────────
+    const sarifPath = flag('sarif');
+    if (sarifPath) {
+        writeFileSync(sarifPath, JSON.stringify(toSarif({ findings, root: target, gatesRun }), null, 2));
+        console.log(`\n  SARIF written: ${sarifPath}  (${findings.length} result(s))`);
+    }
+
+    // ── exit policy ──────────────────────────────────────────────────────────────────────────────
+    // Default `error` and not `warning`, deliberately: a tool whose first run reds somebody's
+    // pipeline gets removed from the pipeline. Tighten with --fail-on once the output is trusted.
+    const RANK = { note: 1, warning: 2, error: 3 };
+    const failOn = flag('fail-on') ?? 'error';
+    const threshold = RANK[failOn] ?? 99;   // --fail-on never  -> nothing reaches it
+    const breaching = findings.filter((f) => (RANK[f.severity] ?? 0) >= threshold);
 
     const byGate = new Map();
     for (const f of findings) byGate.set(f.gateId, [...(byGate.get(f.gateId) ?? []), f]);
@@ -45,8 +63,14 @@ if (cmd === 'audit') {
         }
         if (gate?.why) console.log(`    why: ${gate.why}\n`);
     }
-    console.log(`  ${findings.length} finding(s) from ${byGate.size} gate(s).\n`);
-    process.exit(0);
+    const counts = ['error', 'warning', 'note']
+        .map((s) => [s, findings.filter((f) => f.severity === s).length])
+        .filter(([, n]) => n > 0)
+        .map(([s, n]) => `${n} ${s}`)
+        .join(' · ');
+    console.log(`  ${findings.length} finding(s) from ${byGate.size} gate(s)  —  ${counts}`);
+    console.log(`  exit policy: --fail-on ${failOn}  ->  ${breaching.length} breaching\n`);
+    process.exit(breaching.length ? 1 : 0);
 }
 
 console.log(`

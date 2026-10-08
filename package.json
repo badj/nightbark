@@ -1,13 +1,19 @@
 {
-  "name": "nightbark",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Finds the tests that did not bark - assertions that cannot fail, fixtures that collide, and detectors that were never able to fire.",
-  "license": "MIT",
-  "author": "JJ (Jacob) Badenhorst",
-  "type": "module",
-  "engines": { "node": ">=20" },
-  "scripts": {
-    "selftest": "node --test test/"
-  }
+    "name": "nightbark",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Finds the tests that did not bark - assertions that cannot fail, fixtures that collide, and detectors that were never able to fire.",
+    "license": "MIT",
+    "author": "JJ (Jacob) Badenhorst",
+    "type": "module",
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "selftest": "node bin/nightbark.mjs selftest && node --test \"test/*.test.mjs\"",
+        "audit": "node bin/nightbark.mjs audit"
+    },
+    "bin": {
+        "nightbark": "./bin/nightbark.mjs"
+    }
 }
