@@ -52,6 +52,7 @@ nightbark audit <path> --gate <id>     # one gate
 nightbark audit <path> --sarif out.json  # SARIF 2.1.0 for CI annotation
 nightbark audit <path> --fail-on warning # exit policy: error (default) | warning | note | never
 nightbark selftest                     # prove every gate can fire, and is specific
+nightbark selfcheck                    # enforce ADR-0001 on this repo — no client content
 npm run selftest                       # the above, plus the output-format tests
 ```
 

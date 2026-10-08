@@ -10,7 +10,7 @@
         "node": ">=20"
     },
     "scripts": {
-        "selftest": "node bin/nightbark.mjs selftest && node --test \"test/*.test.mjs\"",
+        "selftest": "node bin/nightbark.mjs selftest && node bin/nightbark.mjs selfcheck && node --test \"test/*.test.mjs\"",
         "audit": "node bin/nightbark.mjs audit"
     },
     "bin": {

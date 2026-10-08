@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { audit } from '../src/runner.mjs';
 import { toSarif } from '../src/report/sarif.mjs';
 import { selftest } from '../src/selftest.mjs';
+import { selfcheck } from '../src/selfcheck.mjs';
 import { gates } from '../src/gates/index.mjs';
 
 const [cmd = 'help', ...rest] = process.argv.slice(2);
@@ -21,6 +22,24 @@ if (cmd === 'selftest') {
         console.log('  "fires" failing = the gate cannot fail. "silent" failing = the gate is too greedy.\n');
     }
     process.exit(bad.length ? 1 : 0);
+}
+
+if (cmd === 'selfcheck') {
+    const { findings, denylistTerms, shapeRules } = selfcheck();
+    console.log(`\n  ADR-0001 self-check — ${shapeRules} shape rule(s), ${denylistTerms} denylist term(s)\n`);
+    if (!denylistTerms) {
+        console.log('  \u26a0\ufe0f  No .nightbark-denylist found. The shape rules ran, but named-term checking did NOT.');
+        console.log('     An absent denylist is not a pass. Create one (gitignored, one term per line) on any');
+        console.log('     machine that has worked on a client codebase.\n');
+    }
+    for (const f of findings) {
+        console.log(`  ${f.rule}  ${f.file}:${f.line}  ${f.hit}`);
+        console.log(`      ${f.why}`);
+    }
+    console.log(findings.length
+        ? `\n  \u2716  ${findings.length} possible client-identifying item(s). ADR-0001 says none may ship.\n`
+        : `  \u2714  No client-identifying content found by the rules that ran.\n`);
+    process.exit(findings.length ? 1 : 0);
 }
 
 if (cmd === 'audit') {
@@ -79,6 +98,7 @@ console.log(`
     nightbark audit [path]        run the gates over a repo (read-only)
     nightbark audit --gate <id>   run one gate
     nightbark selftest            prove every gate can fire, and is specific
+    nightbark selfcheck           enforce ADR-0001 on THIS repo - no client content
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);
