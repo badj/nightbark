@@ -44,6 +44,18 @@ project and it was arrived at by experiment, not taste.
 **Moriarty** — the adversarial pass. Every finding an Irregular raises gets attacked before it is
 reported, because a confident wrong finding costs more trust than a missed one.
 
+## Decisions
+
+The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing direction:
+
+| | |
+| --- | --- |
+| [ADR-0001](docs/adr/0001-no-client-code.md) | No client code, ever. Patterns re-expressed from scratch |
+| [ADR-0002](docs/adr/0002-gates-not-prose.md) | A discipline ships as a gate or an auditor, never as prose |
+| [ADR-0003](docs/adr/0003-targets-and-app-under-test.md) | What we audit, and the app we scaffold against |
+| [ADR-0004](docs/adr/0004-where-the-smarts-live.md) | Gates first; agents only where judgement is required |
+| [INTEGRATIONS](docs/INTEGRATIONS.md) | Emit SARIF / JUnit / exit codes — don't build connectors |
+
 ## Status
 
 Pre-alpha. Phase 0 (decisions) complete. See [docs/TIER-1.md](docs/TIER-1.md) for what "done" means
