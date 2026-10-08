@@ -76,3 +76,26 @@ is useful on day one of a contract with no migration, and the judgement is the p
 ## Licence
 
 MIT © JJ (Jacob) Badenhorst
+
+## Precision
+
+The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. Measured by hand-triaging
+every finding on targets the gates were not written against.
+
+| Target | Files read | Findings | True | Precision |
+| --- | --- | --- | --- | --- |
+| `testmart-parallel-demo` (Playwright) | 77 | 15 | 15 | 100% |
+| `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
+| `cypress-realworld-app` (Cypress) | 170 | 1 | 1 | 100% |
+
+**It took two rounds of red/green to get there, and both failures were mine:**
+
+1. The `silent` fixture caught the gate flagging `waitForTimeout` inside a **string literal** and a
+   `setTimeout` **function definition** — before it ever ran on real code.
+2. On real code it flagged a **React route component** (`src/pages/CheckoutPage.tsx`) whose sleep was
+   deliberate app behaviour, and then a **textbook bounded poll** — the exact pattern this gate's own
+   advice tells people to migrate *to*.
+
+Flagging the remedy as the defect is the fastest way to lose a reader permanently, so both shapes are
+now permanent fixtures. That is the whole argument for [ADR-0002](docs/adr/0002-gates-not-prose.md):
+the proof mechanism found three of its author's mistakes before any user did.
