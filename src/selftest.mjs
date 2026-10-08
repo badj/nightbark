@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gates } from './gates/index.mjs';
+import { audit } from './runner.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -19,6 +20,28 @@ export function selftest() {
         for (const kind of ['fires', 'silent']) {
             const rel = gate.fixtures[kind];
             const abs = join(ROOT, 'fixtures', rel);
+
+            // A project gate's fixture is a DIRECTORY — a collision cannot be shown in one file.
+            // Running it through the real runner also exercises the project-gate plumbing, so the
+            // proof covers the wiring and not just the gate's own logic.
+            if (gate.kind === 'project') {
+                let found;
+                try {
+                    found = audit(abs, { only: [gate.id] }).findings;
+                } catch (err) {
+                    results.push({ gate: gate.id, kind, ok: false, detail: `audit of fixtures/${rel} threw: ${err.message}` });
+                    continue;
+                }
+                const ok = kind === 'fires' ? found.length > 0 : found.length === 0;
+                results.push({
+                    gate: gate.id, kind, ok,
+                    detail: kind === 'fires'
+                        ? (ok ? `${found.length} finding(s)` : 'NO findings — this gate cannot fire')
+                        : (ok ? 'silent, as required' : `${found.length} FALSE POSITIVE(s): ` + found.map((f) => `${f.file}:${f.line} ${f.message}`).join(' | ')),
+                });
+                continue;
+            }
+
             let text;
             try {
                 text = readFileSync(abs, 'utf8');

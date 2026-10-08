@@ -6,7 +6,9 @@
  * makes ADR-0002 structural rather than aspirational.
  */
 import fixedWait from './fixed-wait.mjs';
+import sharedTestIdentity from './shared-test-identity.mjs';
 
 export const gates = [
     fixedWait,
+    sharedTestIdentity,
 ];

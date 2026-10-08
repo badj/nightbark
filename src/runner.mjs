@@ -64,6 +64,10 @@ export function audit(root, { only = null } = {}) {
     const findings = [];
     let filesRead = 0;
 
+    // Project gates accumulate across the whole walk and report once at the end. Each gets its own
+    // fresh state object, so one audit cannot leak into the next.
+    const projectState = new Map(active.filter((g) => g.kind === 'project').map((g) => [g.id, {}]));
+
     for (const file of walk(root)) {
         const applicable = active.filter((g) => g.appliesTo(file.path));
         if (!applicable.length) continue;
@@ -79,6 +83,20 @@ export function audit(root, { only = null } = {}) {
 
         for (const gate of applicable) {
             if ((gate.scope ?? 'test-code') === 'test-code' && !isTest) continue;
+
+            if (gate.kind === 'project') {
+                try {
+                    gate.collect({ path: file.path, text, lines }, projectState.get(gate.id));
+                } catch (err) {
+                    findings.push({
+                        origin: 'gate', gateId: gate.id, severity: 'error', file: file.path, line: 1,
+                        message: `gate "${gate.id}" threw while collecting: ${err.message}`,
+                        why: 'A gate that throws reports nothing, which is indistinguishable from a clean pass.',
+                    });
+                }
+                continue;
+            }
+
             let raw = [];
             try {
                 raw = gate.check({ path: file.path, text, lines }) ?? [];
@@ -103,6 +121,27 @@ export function audit(root, { only = null } = {}) {
                     why: gate.why,
                 });
             }
+        }
+    }
+
+    // Project gates report once, after the whole tree has been seen.
+    for (const gate of active.filter((g) => g.kind === 'project')) {
+        let raw = [];
+        try {
+            raw = gate.report(projectState.get(gate.id)) ?? [];
+        } catch (err) {
+            findings.push({
+                origin: 'gate', gateId: gate.id, severity: 'error', file: '(project)', line: 1,
+                message: `gate "${gate.id}" threw while reporting: ${err.message}`,
+                why: 'A gate that throws reports nothing, which is indistinguishable from a clean pass.',
+            });
+            continue;
+        }
+        for (const f of raw) {
+            findings.push({
+                origin: 'gate', gateId: gate.id, severity: gate.severity,
+                file: f.file, line: f.line, message: f.message, excerpt: f.excerpt, why: gate.why,
+            });
         }
     }
 

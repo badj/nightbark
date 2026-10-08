@@ -88,14 +88,25 @@ every finding on targets the gates were not written against.
 | `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
 | `cypress-realworld-app` (Cypress) | 170 | 1 | 1 | 100% |
 
-**It took two rounds of red/green to get there, and both failures were mine:**
+### What it took — four rounds of red/green, all four failures mine
 
-1. The `silent` fixture caught the gate flagging `waitForTimeout` inside a **string literal** and a
-   `setTimeout` **function definition** — before it ever ran on real code.
-2. On real code it flagged a **React route component** (`src/pages/CheckoutPage.tsx`) whose sleep was
-   deliberate app behaviour, and then a **textbook bounded poll** — the exact pattern this gate's own
-   advice tells people to migrate *to*.
+| | What was wrong | Caught by |
+| --- | --- | --- |
+| 1 | `waitForTimeout` matched inside a **string literal** | `silent` fixture, before any real code |
+| 2 | A `setTimeout` **function definition** read as a call | `silent` fixture |
+| 3 | A **React route component** whose sleep was deliberate app behaviour | first real audit |
+| 4 | A textbook **bounded poll** — the pattern the gate's own advice recommends | first real audit |
+| 5 | `nonexistent@example.com`, a **not-found probe**, read as a shared account | first real audit |
 
-Flagging the remedy as the defect is the fastest way to lose a reader permanently, so both shapes are
-now permanent fixtures. That is the whole argument for [ADR-0002](docs/adr/0002-gates-not-prose.md):
-the proof mechanism found three of its author's mistakes before any user did.
+Flagging the remedy as the defect (4) and flagging correct app behaviour (3) are the two fastest
+ways to lose a reader permanently. Every shape above is now a permanent fixture, so none can return.
+
+### ⚠️ Honest gap
+
+`shared-test-identity` is **proven to fire and proven specific, but has caught nothing real yet.**
+Its fixtures pass and two classes of false positive have been eliminated from it — but no target so
+far actually shares an identity across specs. A gate with zero field findings is not yet validated
+in the field, and saying otherwise would be the exact self-deception this tool exists to catch.
+
+The known real collision shape — the RealWorld App's `database-seed.json` being **mutated by the run
+it seeds** — is a *shared state file*, not a shared identity. That is the next gate.

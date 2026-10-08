@@ -28,7 +28,23 @@
  * @property {{ fires: string, silent: string }} fixtures  paths under fixtures/, relative
  */
 
-const REQUIRED = ['id', 'title', 'why', 'severity', 'appliesTo', 'check', 'fixtures'];
+/**
+ * TWO KINDS OF GATE.
+ *
+ *   kind: 'file'     — `check(file)` sees one file at a time. Most gates.
+ *   kind: 'project'  — `collect(file, state)` is called for every file, then `report(state)` runs
+ *                      once. Needed whenever the finding only exists ACROSS files.
+ *
+ * The project kind is not a convenience; it is the difference between noise and signal for a whole
+ * class of defect. A hard-coded `user@example.com` in ONE spec is test data and flagging it would be
+ * nagging. The SAME literal in TWO specs is shared mutable state, and under parallelism it is a
+ * collision waiting for a busy afternoon. Only a cross-file view can tell those apart.
+ *
+ * Fixtures follow the kind: a file gate names two FILES, a project gate names two DIRECTORIES,
+ * because a collision cannot be demonstrated in a single file.
+ */
+const REQUIRED_FILE = ['id', 'title', 'why', 'severity', 'appliesTo', 'check', 'fixtures'];
+const REQUIRED_PROJECT = ['id', 'title', 'why', 'severity', 'appliesTo', 'collect', 'report', 'fixtures'];
 const SEVERITIES = new Set(['error', 'warning', 'note']);
 
 /**
@@ -38,11 +54,20 @@ const SEVERITIES = new Set(['error', 'warning', 'note']);
  */
 export function validateGate(gate) {
     const problems = [];
-    for (const key of REQUIRED) if (gate?.[key] === undefined) problems.push(`missing "${key}"`);
+    const kind = gate?.kind ?? 'file';
+    if (!['file', 'project'].includes(kind)) problems.push(`kind "${kind}" is not file/project`);
+
+    const required = kind === 'project' ? REQUIRED_PROJECT : REQUIRED_FILE;
+    for (const key of required) if (gate?.[key] === undefined) problems.push(`missing "${key}"`);
+
     if (gate?.id && !/^[a-z][a-z0-9-]*$/.test(gate.id)) problems.push(`id "${gate.id}" is not kebab-case`);
     if (gate?.severity && !SEVERITIES.has(gate.severity)) problems.push(`severity "${gate.severity}" is not one of ${[...SEVERITIES].join('/')}`);
-    if (typeof gate?.check !== 'function') problems.push('"check" is not a function');
     if (typeof gate?.appliesTo !== 'function') problems.push('"appliesTo" is not a function');
+    if (kind === 'file' && typeof gate?.check !== 'function') problems.push('"check" is not a function');
+    if (kind === 'project') {
+        if (typeof gate?.collect !== 'function') problems.push('"collect" is not a function');
+        if (typeof gate?.report !== 'function') problems.push('"report" is not a function');
+    }
     if (gate?.fixtures && (!gate.fixtures.fires || !gate.fixtures.silent)) {
         problems.push('"fixtures" needs BOTH fires and silent — a gate with no near-miss fixture is a gate nobody has proven is specific');
     }
