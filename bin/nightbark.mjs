@@ -3,6 +3,10 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { audit } from '../src/runner.mjs';
 import { toSarif } from '../src/report/sarif.mjs';
+import { candidates } from '../src/irregulars/vacuity.mjs';
+import { brief } from '../src/irregulars/brief.mjs';
+import { challenge } from '../src/irregulars/challenge.mjs';
+import { readFileSync } from 'node:fs';
 import { selftest } from '../src/selftest.mjs';
 import { selfcheck } from '../src/selfcheck.mjs';
 import { gates } from '../src/gates/index.mjs';
@@ -22,6 +26,56 @@ if (cmd === 'selftest') {
         console.log('  "fires" failing = the gate cannot fail. "silent" failing = the gate is too greedy.\n');
     }
     process.exit(bad.length ? 1 : 0);
+}
+
+if (cmd === 'brief') {
+    const which = rest.find((a) => !a.startsWith('--') && a !== 'brief');
+    const target = resolve(rest.filter((a) => !a.startsWith('--') && a !== which)[0] ?? process.cwd());
+    if (which !== 'vacuity') {
+        console.log('\n  usage: nightbark brief vacuity <path> [--out brief.md]\n  (vacuity is the only Irregular so far)\n');
+        process.exit(1);
+    }
+    const found = candidates(target);
+    const text = brief(found, { target });
+    const out = flag('out');
+    if (out) { writeFileSync(out, text); console.log(`\n  brief written: ${out}  (${found.length} candidate(s))\n`); }
+    else console.log(text);
+    process.exit(0);
+}
+
+if (cmd === 'challenge') {
+    // nightbark challenge <repo> <answers.json> [--out challenge.md]
+    const args = rest.filter((a) => !a.startsWith('--'));
+    const target = resolve(args[0] ?? process.cwd());
+    const answersPath = args[1];
+    if (!answersPath) {
+        console.log('\n  usage: nightbark challenge <repo> <answers.json> [--out challenge.md]\n');
+        process.exit(1);
+    }
+    let answers;
+    try {
+        answers = JSON.parse(readFileSync(answersPath, 'utf8'));
+        if (!Array.isArray(answers)) throw new Error('expected a JSON array');
+    } catch (err) {
+        console.log(`\n  cannot read answers: ${err.message}\n`);
+        process.exit(1);
+    }
+    const found = candidates(target);
+    // ⚠️ An answer naming an id that was never a candidate means the judge invented a finding for
+    // code it was not shown. Refuse rather than carry it forward.
+    const known = new Set(found.map((c) => c.id));
+    const ghosts = answers.filter((a) => !known.has(a.id)).map((a) => a.id);
+    if (ghosts.length) {
+        console.log(`\n  \u26a0\ufe0f  ${ghosts.length} answer(s) name an id that is not a candidate:`);
+        for (const g of ghosts.slice(0, 5)) console.log(`      ${g}`);
+        console.log('      An invented id means a finding for code the judge never saw. Refusing.\n');
+        process.exit(1);
+    }
+    const text = challenge(found, answers, { target });
+    const out = flag('out');
+    if (out) { writeFileSync(out, text); console.log(`\n  challenge written: ${out}\n`); }
+    else console.log(text);
+    process.exit(0);
 }
 
 if (cmd === 'selfcheck') {
@@ -99,6 +153,8 @@ console.log(`
     nightbark audit --gate <id>   run one gate
     nightbark selftest            prove every gate can fire, and is specific
     nightbark selfcheck           enforce ADR-0001 on THIS repo - no client content
+    nightbark brief vacuity <p>   gather candidates + context for the vacuity Irregular
+    nightbark challenge <p> <a>   Moriarty: attack the findings a judge returned
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);

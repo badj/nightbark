@@ -81,3 +81,26 @@ Consequences, recorded so the gap is not mistaken for coverage:
 Not "how many findings" — **how many findings a competent engineer agrees with.** A 60%-precision
 auditor is worse than no auditor, because the next person stops reading the output and the one real
 finding dies with the noise. Track precision from the first run and publish it in the README.
+
+## ⚠️ The next capability, named by Moriarty: resolve page objects
+
+Run end to end on 2026-10-09, the adversarial pass said the single biggest structural push toward
+confirming a finding was this:
+
+> *"Withholding every page object while two of three claims turn on one is the biggest structural
+> push toward confirm, defused only because the file explicitly says that case is `uncertain`."*
+
+Two of the three claims could not be settled either way because the judge was shown
+`homePage.heroSignInLink` and `loginPage.header.signOutButton` as **names only**. Whether
+`heroSignInLink` lives inside the already-asserted `heroAuthMessage` decides whether that finding is
+real, and nobody could tell.
+
+So the candidate finder should **resolve a locator back to its definition** and include it:
+
+1. From `homePage.heroSignInLink`, find the class behind `homePage` (a fixture, an import, a `new`).
+2. In that class, find where `heroSignInLink` is assigned, and include those lines.
+3. Include the sibling locators it is being compared against, so containment is judgeable.
+
+That turns the commonest `downgraded` verdict into a decidable one. It is the highest-value
+remaining work on this Irregular — higher than a fourth gate — because the gap it closes was found
+by measurement rather than guessed at.
