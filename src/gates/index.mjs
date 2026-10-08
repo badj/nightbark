@@ -7,8 +7,10 @@
  */
 import fixedWait from './fixed-wait.mjs';
 import sharedTestIdentity from './shared-test-identity.mjs';
+import serialisedSuite from './serialised-suite.mjs';
 
 export const gates = [
     fixedWait,
     sharedTestIdentity,
+    serialisedSuite,
 ];

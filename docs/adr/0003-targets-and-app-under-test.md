@@ -48,6 +48,13 @@ every layer at once:
 | Database | `database-seed.json` (~11k lines), live `database.json`, `empty-seed.json` — seedable **and** resettable |
 | Auth | local passport, plus Okta / Auth0 / Google / Cognito |
 | Gap worth filling | **zero** accessibility coverage repo-wide |
+| Known real defect | `fileParallelism: false` in `vite.config.ts` — **parallelism surrendered repo-wide** to avoid races on the shared `database.json`, upstream issue #1666 |
+
+⛔ **Correction (2026-10-09).** An earlier version of this ADR and of the README claimed the seed file
+was "mutated by the run it seeds". That was wrong — it is regenerated on purpose by
+`scripts/generateSeedData.ts`. The claim came from reading a dirty `git status` as evidence of a
+defect, which is precisely the inference this project exists to catch. Recorded rather than quietly
+deleted, because a retraction with no trace is how the same wrong fact gets re-derived later.
 
 Three things it gives us that a synthetic fixture app cannot:
 

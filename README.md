@@ -86,9 +86,9 @@ every finding on targets the gates were not written against.
 | --- | --- | --- | --- | --- |
 | `testmart-parallel-demo` (Playwright) | 77 | 15 | 15 | 100% |
 | `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
-| `cypress-realworld-app` (Cypress) | 170 | 1 | 1 | 100% |
+| `cypress-realworld-app` (Cypress) | 170 | 2 | 2 | 100% |
 
-### What it took — four rounds of red/green, all four failures mine
+### What it took — six rounds of red/green, all six failures mine
 
 | | What was wrong | Caught by |
 | --- | --- | --- |
@@ -97,6 +97,7 @@ every finding on targets the gates were not written against.
 | 3 | A **React route component** whose sleep was deliberate app behaviour | first real audit |
 | 4 | A textbook **bounded poll** — the pattern the gate's own advice recommends | first real audit |
 | 5 | `nonexistent@example.com`, a **not-found probe**, read as a shared account | first real audit |
+| 6 | `serialised-suite` only matched configs *named* after a tool, so `e2e.config.ts` was invisible | `fires` fixture |
 
 Flagging the remedy as the defect (4) and flagging correct app behaviour (3) are the two fastest
 ways to lose a reader permanently. Every shape above is now a permanent fixture, so none can return.
@@ -108,5 +109,19 @@ Its fixtures pass and two classes of false positive have been eliminated from it
 far actually shares an identity across specs. A gate with zero field findings is not yet validated
 in the field, and saying otherwise would be the exact self-deception this tool exists to catch.
 
-The known real collision shape — the RealWorld App's `database-seed.json` being **mutated by the run
-it seeds** — is a *shared state file*, not a shared identity. That is the next gate.
+⛔ **A claim I made here was WRONG and is retracted.** I wrote that the RealWorld App's
+`database-seed.json` was "mutated by the run it seeds". It is not: the seed is regenerated
+deliberately by `scripts/generateSeedData.ts`, and `prestart` copies seed to live. What I had
+actually seen was a `git status` showing the file modified after someone ran `yarn db:seed`. I
+inferred a defect from a dirty working tree — the same shape of mistake this tool is built to find,
+made while building it.
+
+The real collision shape, verified, is better anyway and is the next gate: the RealWorld App's
+`vite.config.ts` carries
+
+```js
+fileParallelism: false, // #1666: Run tests sequentially to avoid race conditions with shared database.json file.
+```
+
+**Parallelism surrendered repo-wide, with an upstream issue number attached.** That is the true cost
+of shared mutable state — not a flaky test, but permanently giving up concurrency.
