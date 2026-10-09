@@ -297,25 +297,89 @@ is useful on day one of a contract with no migration, and the judgement is the p
 
 ## Precision
 
-The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. **Every finding below was
-hand-triaged**, on targets the gates were not written against.
+The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. The bar is **how many findings
+a competent engineer agrees with**, because a 60%-precision auditor is worse than none: the next
+person stops reading and the one real finding dies with the noise.
 
-| Target | Files read | Findings | True | Precision |
-| --- | --- | --- | --- | --- |
-| `testmart-parallel-demo` (Playwright) | 77 | 15 | 15 | 100% |
-| `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
-| `cypress-realworld-app` (Cypress) | 170 | 2 | 2 | 100% |
-| a 217-file production suite (Playwright + BDD) | 217 | 25 | 23 | 92% |
-| **total** | **493** | **42** | **40** | **95%** |
+⚠️ **Re-measured from scratch on 2026-10-10 against EIGHT targets, because the previous figure was
+taken with earlier gate versions.** Mixing the two would have produced a number describing no
+version of the tool that ever existed — the precise failure this project warns about elsewhere, so
+the old 493-file figure is superseded rather than extended.
 
-Per gate:
+| Target | What it is | Files read | Findings |
+| --- | --- | --- | --- |
+| `testmart-parallel-demo` | a deliberate Playwright demo | 77 | 15 |
+| `playwright-hybrid-integration-API-UI-A11y` | a careful personal suite | 29 | 0 |
+| `cypress-realworld-app` | the Cypress team's reference app | 168 | 2 |
+| **`element-hq/element-web`** | Matrix client, shipped product | 219 | 55 |
+| **`TryGhost/Ghost`** | publishing platform, shipped product | 276 | 5 |
+| **`calcom/cal.com`** | scheduling platform, shipped product | 96 | 18 |
+| **`RocketChat/Rocket.Chat`** | team chat, shipped product | 381 | 116 |
+| a production BDD suite | Playwright + playwright-bdd, under delivery pressure | 217 | 39 |
+| **total** | **8 targets** | **1463** | **250** |
 
-| Gate | Findings | True | Precision | Note |
-| --- | --- | --- | --- | --- |
-| `fixed-wait` | 31 | 31 | **100%** | the workhorse — fixed sleeps appear even in careful code |
-| `serialised-suite` | 8 | 8 | **100%** | ⚠️ 4 cite a reason the suite's own notes record as superseded |
-| `traceability` | 13 | 13 | **100%** | all `note` — that suite is clean on the unambiguous check |
-| `shared-test-identity` | 3 | 1 | **33%** | reports as a `note` for exactly this reason |
+157 warning · 93 note · 0 error. Per gate:
+
+| Gate | Findings | Precision | Note |
+| --- | --- | --- | --- |
+| `fixed-wait` | 144 | **100%** after four corrections | the workhorse — fixed sleeps appear even in careful code |
+| `serialised-suite` | 87 | **5 → 100%** after splitting two defects apart | 5 suite-level warnings; the rest are block-level notes |
+| `traceability` | 13 | **100%** | all `note`; the client suite is clean on the unambiguous check |
+| `shared-test-identity` | 6 | **0% on the new targets** | reports as a `note` for exactly this reason — see below |
+
+### ⚠️ What widening the targets actually bought
+
+TIER-1 recorded that the three original targets were **too clean**: a deliberate demo, a careful
+personal suite, and a reference app — unusually *good* code, with zero traceability ids, zero
+floating assertions, zero swallowed exceptions between them. It said no further field-unvalidatable
+gate should ship until the target set was widened. So it was: four **shipped products** whose suites
+run under real delivery pressure.
+
+Four hours of that found **six defects in nightbark**, three of them in the two places a tool is
+least likely to look at itself:
+
+| | What was wrong | How it was found |
+| --- | --- | --- |
+| 1 | ⛔ **`traceability` read 0 of cal.com's 53 specs and reported it clean.** cal.com names them `*.e2e.ts`; the gate's own `appliesTo` accepted only `.spec.`/`.test.` | counting the files it claimed to have read |
+| 2 | **Four gates each had their own regex for "a test file"**, giving three different answers — the root cause of (1). Now one exported definition in [`src/testfiles.mjs`](src/testfiles.mjs) | fixing (1) properly instead of locally |
+| 3 | ⛔ **`--fail-on=never` was silently ignored.** The CLI read only `--name value`, so `--name=value` fell through to the default — flipping CI exit codes with nothing said. An unknown flag now exits 2 | believing four scoped audits were scoped, and they were not |
+| 4 | **`serialised-suite` scored 5% (5 of 98).** It conflated `describe.serial` with `workers: 1`, but files still run in parallel — Rocket.Chat uses it as house style in 73 files | a repo large enough for a house style to exist |
+| 5 | **A sleep guard was missing from its third branch** — again. The poll guard went on `setTimeout`, later on `waitForTimeout`, and never onto named sleeps | a mail client polling with `await this.delay(500)` |
+| 6 | **Then the fix for (5) introduced a false NEGATIVE**, which is the worse trade because nothing announces it. An over-eager poll guard hid a genuine sleep inside `for (const screen of SCREENS)` | the per-target counts dropping where no false positive had been reported |
+
+Three false-positive classes came out of it, each now a near-miss fixture so it cannot regress:
+
+- ⛔ **a sleep inside a `page.route()` handler is the stimulus, not the wait.** The test asserts a
+  menu stays open *while* a load is slow — the delay is the condition under test, so "replace this
+  with a wait on what you depend on" asks the author to delete their own test.
+- **the deadline arm of a `Promise.race`** — a `setTimeout` whose continuation *throws* is a timeout,
+  not a sleep. No loop, so the poll guard never covered it.
+- **a named sleep as a poll interval**, the third branch of (5) above.
+
+And one lesson that generalises past this tool: **an iteration loop is not a poll loop.** A sleep
+inside `for (const x of xs)` is paid once per element and is as fixed as any other; only a loop that
+*re-tests* something makes a sleep an interval.
+
+### `shared-test-identity` scored 0% — and that is now the design brief
+
+Three findings on the new targets, all false:
+
+| | The literal | Why it is not a defect |
+| --- | --- | --- |
+| cal.com ×2 | `first+seats@cal.com` | attendee *payload* passed to a fixture that creates and tears down its own booking per test |
+| Rocket.Chat | `mail@mail.com` | an export destination typed into a field, and a deliberately non-existent address in a forgot-password flow |
+
+In **all three** the literal is an **inline call argument**. Its one historical true positive was
+**bound to a named constant beside a pool it was not part of**. That is a far sharper signal than
+*shared*, it needs resolution rather than matching, and per
+[ADR-0005](docs/adr/0005-how-an-irregular-runs.md) a shape too ambiguous to be a gate is exactly
+right as a candidate finder for an Irregular.
+
+### ⚠️ `traceability` has no field data, and now that is MEASURED rather than assumed
+
+Zero traceability ids across **seven** public repositories — 694 spec files actually read, after
+fix (1) above. The synthetic target is not a convenience; there is genuinely nothing to measure
+against in public code.
 
 ### ⚠️ One target is SYNTHETIC, and is kept in its own row
 

@@ -62,3 +62,49 @@ export async function findRow(page: any, name: string, timeoutMs = 5000) {
   }
   return hit;
 }
+
+// ⚠️ A NAMED SLEEP AS A POLL INTERVAL — the THIRD branch, and the one the guard was still missing
+// when four real repositories were audited. It fired on exactly this shape in a mail client helper.
+// Shapes and exemptions are now separate functions so a fourth branch cannot ship without the guard.
+export async function waitForMessages(client: any, want: number, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const messages = await client.search();
+    if (messages.length >= want) return messages;
+    await delay(500);
+  }
+  throw new Error(`Timeout after ${timeoutMs}ms waiting for search results`);
+}
+
+// ⛔ A SLEEP INSIDE A ROUTE HANDLER IS THE STIMULUS, NOT THE WAIT. The test asserts the menu stays
+// open WHILE the load is slow, so the delay is the condition under test — deleting it deletes the
+// test. Measured as a false positive on two separate real suites.
+export async function assertMenuSurvivesSlowLoad(page: any) {
+  await page.route('**/dynamic-import/fetch', async (route: any, request: any) => {
+    if (request.postData()?.includes('HomePage')) {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate network delay
+    }
+    await route.continue();
+  });
+  await page.goto('/home');
+  await page.getByRole('button', { name: 'Create new' }).waitFor();
+}
+
+// ⚠️ THE DEADLINE ARM OF A RACE — a setTimeout whose continuation THROWS is a timeout, not a sleep.
+// No loop, so the poll guard never covered it. This is how a bounded wait gets an upper limit.
+export async function waitForMembership(cli: any, roomId: string, membership: string) {
+  const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1000)).then(() => {
+    throw new Error(`Timeout waiting for room ${roomId} membership (wanted '${membership}')`);
+  });
+  const readyPromise = new Promise<void>((resolve) => cli.once('ready', resolve));
+  await Promise.race([readyPromise, timeoutPromise]);
+}
+
+// And the same idea written the other way round: reject INSIDE the setTimeout.
+export function withDeadline<T>(p: Promise<T>, ms = 2000): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('deadline')), ms))]);
+}
+
+async function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}

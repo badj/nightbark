@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { gates } from './gates/index.mjs';
+import { SPEC_FILENAME, TEST_ROOT } from './testfiles.mjs';
 
 /** Directories never worth reading. Kept small and boring on purpose. */
 const SKIP_DIRS = new Set([
@@ -45,8 +46,8 @@ export function* walk(root, dir = root) {
  * framework. That last one is what keeps genuine Page Objects in scope (they import `Page` for its
  * type) while leaving app components out.
  */
-const SPEC_NAME = /\.(spec|test)\.[cm]?[tj]sx?$/;
-const TEST_ROOT = /(^|\/)(tests?|e2e|__tests__|cypress|playwright|specs?|features)\//;
+// Both live in ./testfiles.mjs — a leaf module, so a gate can import them without a cycle.
+const SPEC_NAME = SPEC_FILENAME;
 const FRAMEWORK_IMPORT = /from\s+['"](?:@playwright\/test|playwright(?:-core)?|@jest\/globals|vitest|cypress|@cucumber\/cucumber|playwright-bdd)['"]/;
 
 export function looksLikeTestCode(path, text) {
@@ -118,7 +119,12 @@ export function audit(root, { only = null } = {}) {
                 findings.push({
                     origin: 'gate',
                     gateId: gate.id,
-                    severity: gate.severity,
+                    // ⚠️ A FILE gate may lower its own severity too. Only the project path honoured
+                    // this, and the asymmetry was a latent trap: a file gate that set `severity` on
+                    // a finding would have it silently ignored, so a judgement call would publish as
+                    // an unambiguous defect. One gate reporting two different kinds of thing is
+                    // normal; flattening them is what makes a reader distrust both.
+                    severity: f.severity ?? gate.severity,
                     file: file.path,
                     line: f.line,
                     message: f.message,

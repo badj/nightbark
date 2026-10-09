@@ -79,3 +79,27 @@ Three things it gives us that a synthetic fixture app cannot:
   depend on an external repo staying still.
 - Precision is measured per target and published. A target where precision is poor is a finding about
   `nightbark`, not about the target.
+
+
+## ⚠️ Widened 2026-10-10 — the original three were too clean
+
+TIER-1 recorded the problem and the condition: the three targets are a deliberate demo, a careful
+personal suite and a reference app, with **zero** traceability ids, floating assertions or swallowed
+exceptions between them, and *"no further field-unvalidatable gate ships until the target set is
+widened"*. This is that widening.
+
+| Added | What it is | Why this one |
+| --- | --- | --- |
+| `element-hq/element-web` | Matrix client | 237 e2e specs; a crypto-heavy suite with genuine timing pressure |
+| `TryGhost/Ghost` | publishing platform | a visual-regression suite — a different shape of flake entirely |
+| `calcom/cal.com` | scheduling platform | heavy fixture-factory usage, and it names specs `*.e2e.ts` |
+| `RocketChat/Rocket.Chat` | team chat | 178 e2e specs with a strong house style, which is what exposes a gate that assumes its own conventions |
+
+**The selection criterion is "ordinary quality under delivery pressure", not "large".** A tidy repo
+cannot disconfirm a gate. All four are shipped products with users, release pressure and accumulated
+history — and between them they found six defects in nightbark in an afternoon, including a gate
+reporting a repository clean without reading any of its spec files.
+
+⚠️ **Read-only, and nothing is copied.** These are measurement targets, not sources: per
+[ADR-0001](0001-no-client-code.md) no code or convention is lifted from any of them, and `audit`
+cannot write. Each is cloned shallow and sparse into a scratch directory, never committed here.

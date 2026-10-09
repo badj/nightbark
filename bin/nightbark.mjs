@@ -18,7 +18,57 @@ import { gates } from '../src/gates/index.mjs';
 
 const [cmd = 'help', ...rest] = process.argv.slice(2);
 // top-level await is available (ESM); sink:ado is the only async command.
-const flag = (name) => { const i = rest.indexOf(`--${name}`); return i === -1 ? null : rest[i + 1]; };
+
+/**
+ * ⚠️ BOTH `--name value` AND `--name=value`, and an UNKNOWN flag is REFUSED.
+ *
+ * The first version read only the space-separated form and ignored everything else in silence. That
+ * is not a cosmetic gap, and it is the exact failure this project exists to find:
+ *
+ *   --fail-on=never   was ignored, so the exit policy silently fell back to `error` and a run meant
+ *                     to be advisory started breaking builds. The opposite is worse: --fail-on=note
+ *                     ignored means a stricter intent silently relaxed, and NOTHING SAYS SO.
+ *   --sarif=out.json  wrote no file, and reported success.
+ *   --gate=fixed-wait audited every gate instead of one.
+ *
+ * Found by using the tool on four real repositories and believing four scoped audits were scoped.
+ * If it misleads the author inside ten minutes it will mislead anyone, so an unrecognised flag now
+ * exits non-zero rather than being dropped — a tool whose whole thesis is "a silent default is the
+ * dangerous one" cannot ship a silent default in its own argument parser.
+ */
+const KNOWN = {
+    audit: ['gate', 'sarif', 'fail-on'],
+    init: ['base-url', 'force'],
+    brief: ['out'],
+    challenge: ['out'],
+    verdict: ['answers', 'verdicts', 'sarif'],
+    'sink:ado': ['org', 'project', 'plan', 'case', 'suites', 'outcome', 'arm', 'diagnose'],
+    selftest: [], selfcheck: [], help: [],
+};
+
+const flag = (name) => {
+    const i = rest.indexOf(`--${name}`);
+    if (i !== -1) return rest[i + 1] ?? '';
+    const eq = rest.find((a) => a.startsWith(`--${name}=`));
+    return eq === undefined ? null : eq.slice(name.length + 3);
+};
+const bool = (name) => rest.includes(`--${name}`) || rest.includes(`--${name}=true`);
+
+{
+    const allowed = KNOWN[cmd];
+    if (allowed) {
+        const given = rest.filter((a) => a.startsWith('--')).map((a) => a.replace(/^--/, '').split('=')[0]);
+        const unknown = [...new Set(given.filter((g) => !allowed.includes(g)))];
+        if (unknown.length) {
+            console.log(`\n  unknown flag(s) for "${cmd}": ${unknown.map((u) => `--${u}`).join(', ')}`);
+            console.log(`  ${allowed.length ? `this command takes: ${allowed.map((a) => `--${a}`).join(', ')}` : 'this command takes no flags'}`);
+            console.log('\n  \u26a0\ufe0f  Refusing rather than ignoring it. A dropped --fail-on or --gate changes what the');
+            console.log('      command does while still reporting success, which is the one outcome this tool exists');
+            console.log('      to prevent.\n');
+            process.exit(2);
+        }
+    }
+}
 
 if (cmd === 'selftest') {
     const results = selftest();
@@ -45,10 +95,10 @@ if (cmd === 'sink:ado') {
     const cases = (flag('case') ?? '').split(',').filter(Boolean);
     const suites = (flag('suites') ?? '').split(',').filter(Boolean);
     const pat = process.env.AZURE_TOKEN;
-    const armed = rest.includes('--arm');
+    const armed = bool('arm');
     const outcome = flag('outcome') ?? 'passed';
 
-    const diagnosing = rest.includes('--diagnose');
+    const diagnosing = bool('diagnose');
 
     if (!org || !project || (!diagnosing && (!plan || !cases.length))) {
         console.log(`
@@ -103,7 +153,7 @@ if (cmd === 'init') {
     try {
         const { target, name, files } = init(dir, {
             baseURL: flag('base-url') ?? 'http://localhost:3000',
-            force: rest.includes('--force'),
+            force: bool('force'),
         });
         console.log(`\n  scaffolded ${name} -> ${target}\n`);
         for (const f of files) console.log(`      ${f}`);

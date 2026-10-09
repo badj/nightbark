@@ -1,4 +1,5 @@
 import { validateGate } from '../gate.mjs';
+import { SPEC_FILENAME } from '../testfiles.mjs';
 
 /**
  * A requirement link that is lying.
@@ -100,7 +101,9 @@ export default validateGate({
     severity: 'error',
     scope: 'test-code',
 
-    appliesTo: (path) => /\.feature$/.test(path) || /\.(spec|test)\.[cm]?[tj]sx?$/.test(path),
+    // ⚠️ SPEC_FILENAME, not a local regex. A local one here read 0 of cal.com's 53 `*.e2e.ts`
+    // specs and called the repo clean. See the note on SPEC_FILENAME in runner.mjs.
+    appliesTo: (path) => /\.feature$/.test(path) || SPEC_FILENAME.test(path),
 
     collect({ path, lines }, state) {
         state.byId ??= new Map();     // id -> Map<testKey, {file, line, name}>
