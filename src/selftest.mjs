@@ -32,22 +32,7 @@ export function selftest() {
                     results.push({ gate: gate.id, kind, ok: false, detail: `audit of fixtures/${rel} threw: ${err.message}` });
                     continue;
                 }
-                // ⚠️ `>0` IS TOO WEAK AN ASSERTION, and that is not a hypothetical. A fires fixture
-                // planting THREE faults reported only one, and the proof passed anyway — so a gate
-                // catching a third of what it should looked healthy. Where a gate declares
-                // `fixtures.expect`, the count must match exactly.
-                const want = gate.fixtures.expect;
-                const ok = kind === 'fires'
-                    ? (want === undefined ? found.length > 0 : found.length === want)
-                    : found.length === 0;
-                results.push({
-                    gate: gate.id, kind, ok,
-                    detail: kind === 'fires'
-                        ? (ok ? `${found.length} finding(s)${want !== undefined ? ' (exactly as declared)' : ''}`
-                              : want === undefined ? 'NO findings — this gate cannot fire'
-                              : `${found.length} finding(s) but the fixture declares ${want} — ${found.length < want ? 'faults are being MISSED' : 'something extra is firing'}`)
-                        : (ok ? 'silent, as required' : `${found.length} FALSE POSITIVE(s): ` + found.map((f) => `${f.file}:${f.line} ${f.message}`).join(' | ')),
-                });
+                results.push({ gate: gate.id, kind, ...verdict(gate, kind, found, (f) => `${f.file}:${f.line}`) });
                 continue;
             }
 
@@ -69,12 +54,41 @@ export function selftest() {
                 results.push({ gate: gate.id, kind, ok: false, detail: `check() threw: ${err.message}` });
                 continue;
             }
-            const ok = kind === 'fires' ? found.length > 0 : found.length === 0;
-            const detail = kind === 'fires'
-                ? (ok ? `${found.length} finding(s)` : 'NO findings — this gate cannot fire')
-                : (ok ? 'silent, as required' : `${found.length} FALSE POSITIVE(s): ` + found.map((f) => `L${f.line} ${f.message}`).join(' | '));
-            results.push({ gate: gate.id, kind, ok, detail });
+            results.push({ gate: gate.id, kind, ...verdict(gate, kind, found, (f) => `L${f.line}`) });
         }
     }
     return results;
+}
+
+/**
+ * The verdict for one proof — ONE implementation, used by file gates and project gates alike.
+ *
+ * ⚠️ `>0` IS TOO WEAK AN ASSERTION, and that is not hypothetical. A fires fixture planting THREE
+ * faults reported only one and the proof passed anyway, so a gate catching a third of what it should
+ * looked healthy. Where a gate declares `fixtures.expect`, the count must match EXACTLY.
+ *
+ * ⛔ AND THIS FUNCTION EXISTS BECAUSE THE CHECK WAS ONLY ON ONE OF THE TWO PATHS. `fixtures.expect`
+ * was read inside the project-gate branch and nowhere else, so declaring `expect: 4` on `fixed-wait`
+ * — a FILE gate — was accepted by `validateGate` and then silently ignored. Blinding that gate's
+ * matcher took its fires fixture from 4 findings to 2 and `selftest` still exited 0.
+ *
+ * A declaration that does nothing is worse than no declaration, because it reads as protection. And
+ * it is the second instance of one shape in a day: a feature implemented on one of two parallel code
+ * paths (the other was per-finding severity, honoured by the project path and dropped by the file
+ * path). Hence one function rather than a third careful copy.
+ *
+ * Found by DEMONSTRATING the tool — breaking a gate on purpose in front of someone.
+ */
+function verdict(gate, kind, found, where) {
+    const want = gate.fixtures.expect;
+    const ok = kind === 'fires'
+        ? (want === undefined ? found.length > 0 : found.length === want)
+        : found.length === 0;
+    const detail = kind === 'fires'
+        ? (ok ? `${found.length} finding(s)${want !== undefined ? ' (exactly as declared)' : ''}`
+              : want === undefined ? 'NO findings — this gate cannot fire'
+              : `${found.length} finding(s) but the fixture declares ${want} — ${found.length < want ? 'faults are being MISSED' : 'something extra is firing'}`)
+        : (ok ? 'silent, as required'
+              : `${found.length} FALSE POSITIVE(s): ` + found.map((f) => `${where(f)} ${f.message}`).join(' | '));
+    return { ok, detail };
 }

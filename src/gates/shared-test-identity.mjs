@@ -121,7 +121,7 @@ export default validateGate({
         return findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
     },
 
-    fixtures: { fires: 'shared-test-identity/fires', silent: 'shared-test-identity/silent' },
+    fixtures: { fires: 'shared-test-identity/fires', silent: 'shared-test-identity/silent', expect: 1 },
 });
 
 /**

@@ -130,7 +130,7 @@ export default validateGate({
         return found;
     },
 
-    fixtures: { fires: 'serialised-suite/fires.config.ts', silent: 'serialised-suite/silent.config.ts' },
+    fixtures: { fires: 'serialised-suite/fires.config.ts', silent: 'serialised-suite/silent.config.ts', expect: 4 },
 });
 
 /**

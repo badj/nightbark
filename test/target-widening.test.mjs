@@ -212,3 +212,46 @@ test('⚠️ a FILE gate may lower its own severity, like a project gate already
     assert.ok(findings.length > 0, 'the fixture must produce something to assert on');
     assert.ok(findings.every((f) => ['error', 'warning', 'note'].includes(f.severity)));
 });
+
+// ── the proof harness itself ───────────────────────────────────────────────────────────────────
+
+test('⛔ fixtures.expect is enforced for FILE gates too, not only project gates', async () => {
+    // The check lived inside the project-gate branch and nowhere else, so declaring expect on a
+    // file gate was accepted by validateGate and then silently ignored — blinding fixed-wait's
+    // matcher took its fires fixture from 4 findings to 2 and selftest still exited 0.
+    //
+    // A declaration that does nothing is worse than no declaration: it reads as protection.
+    const { selftest } = await import('../src/selftest.mjs');
+    const { gates } = await import('../src/gates/index.mjs');
+
+    for (const g of gates) {
+        assert.equal(typeof g.fixtures.expect, 'number', `${g.id} must declare fixtures.expect`);
+    }
+    const results = selftest();
+    const fires = results.filter((r) => r.kind === 'fires');
+    assert.ok(fires.length >= 4);
+    // Every passing fires proof must say the count was checked, on BOTH kinds of gate.
+    for (const r of fires) {
+        assert.ok(r.ok, `${r.gate} fires: ${r.detail}`);
+        assert.match(r.detail, /exactly as declared/, `${r.gate} did not have its count enforced`);
+    }
+});
+
+test('a declared count that does not match FAILS the proof, with a direction', async () => {
+    const { selftest } = await import('../src/selftest.mjs');
+    const { gates } = await import('../src/gates/index.mjs');
+    const victim = gates.find((g) => g.id === 'fixed-wait');
+    const real = victim.fixtures.expect;
+    try {
+        victim.fixtures.expect = real + 1;          // claim one more fault than the fixture plants
+        const r = selftest().find((x) => x.gate === 'fixed-wait' && x.kind === 'fires');
+        assert.equal(r.ok, false);
+        assert.match(r.detail, /faults are being MISSED/, 'it must say WHICH direction is wrong');
+        victim.fixtures.expect = Math.max(1, real - 1);
+        const r2 = selftest().find((x) => x.gate === 'fixed-wait' && x.kind === 'fires');
+        assert.equal(r2.ok, false);
+        assert.match(r2.detail, /something extra is firing/);
+    } finally {
+        victim.fixtures.expect = real;
+    }
+});
