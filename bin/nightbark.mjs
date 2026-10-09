@@ -8,12 +8,15 @@ import { brief } from '../src/irregulars/brief.mjs';
 import { challenge } from '../src/irregulars/challenge.mjs';
 import { mergeVerdicts } from '../src/irregulars/verdict.mjs';
 import { init } from '../src/init/index.mjs';
+import { adoSink } from '../src/sinks/ado.mjs';
+import { describePublish, publishFailed } from '../src/sinks/sink.mjs';
 import { readFileSync } from 'node:fs';
 import { selftest } from '../src/selftest.mjs';
 import { selfcheck } from '../src/selfcheck.mjs';
 import { gates } from '../src/gates/index.mjs';
 
 const [cmd = 'help', ...rest] = process.argv.slice(2);
+// top-level await is available (ESM); sink:ado is the only async command.
 const flag = (name) => { const i = rest.indexOf(`--${name}`); return i === -1 ? null : rest[i + 1]; };
 
 if (cmd === 'selftest') {
@@ -28,6 +31,48 @@ if (cmd === 'selftest') {
         console.log('  "fires" failing = the gate cannot fail. "silent" failing = the gate is too greedy.\n');
     }
     process.exit(bad.length ? 1 : 0);
+}
+
+if (cmd === 'sink:ado') {
+    // ⚠️ A FENCE CHECK FIRST, publishing second. The failure this exists for is a scope that has
+    // gone stale: the plan is reorganised, the scoped ids no longer match any test point, and the
+    // publish reports every case as a tick while writing nothing. That is invisible in the output
+    // of a normal run, so it gets its own command - and it is READ-ONLY unless --arm is passed.
+    const org = flag('org') ?? process.env.ADO_ORG;
+    const project = flag('project') ?? process.env.ADO_PROJECT;
+    const plan = flag('plan');
+    const cases = (flag('case') ?? '').split(',').filter(Boolean);
+    const suites = (flag('suites') ?? '').split(',').filter(Boolean);
+    const pat = process.env.AZURE_TOKEN;
+    const armed = rest.includes('--arm');
+    const outcome = flag('outcome') ?? 'passed';
+
+    if (!org || !project || !plan || !cases.length) {
+        console.log(`
+  usage: nightbark sink:ado --org <o> --project <p> --plan <id> --case <id[,id]> [--suites a,b]
+                            [--outcome passed|failed|blocked] [--arm]
+
+  Read-only without --arm: it resolves each case to its test point(s) and tells you whether the
+  scope actually matches anything. AZURE_TOKEN must be set (needs Test Management read & write).
+
+  \u26a0\ufe0f  Run this BEFORE trusting any scoped publish. A stale scope writes nothing and reports
+      success, so "it ran green" is not evidence that anything was recorded.
+`);
+        process.exit(1);
+    }
+    try {
+        const sink = adoSink({ org, project, pat });
+        const report = await sink.publish(
+            cases.map((caseId) => ({ ref: { caseId, planId: plan, suiteIds: suites }, outcome, comment: 'nightbark' })),
+            { armed },
+        );
+        console.log(`\n  ${sink.id} — plan ${plan}${suites.length ? ` scoped to suites ${suites.join(',')}` : ' (all suites)'}\n`);
+        console.log('  ' + describePublish(report).split('\n').join('\n  ') + '\n');
+        process.exit(publishFailed(report) ? 1 : 0);
+    } catch (err) {
+        console.log(`\n  ${err.message}\n`);
+        process.exit(1);
+    }
 }
 
 if (cmd === 'init') {
@@ -238,6 +283,7 @@ console.log(`
     nightbark brief vacuity <p>   gather candidates + context for the vacuity Irregular
     nightbark challenge <p> <a>   Moriarty: attack the findings a judge returned
     nightbark verdict <p> ...     merge judge + Moriarty into findings (--sarif, --fail-on)
+    nightbark sink:ado ...        check an ADO Test Plan scope resolves (read-only unless --arm)
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);

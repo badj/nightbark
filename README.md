@@ -93,6 +93,57 @@ no destination-specific code. See [INTEGRATIONS](docs/INTEGRATIONS.md).
 ⚠️ `--fail-on` defaults to **`error`**, not `warning`. A tool whose first run reds somebody's
 pipeline gets removed from the pipeline; tighten it once the output has earned trust.
 
+## Publishing results — `TestCaseSink`
+
+SARIF and JUnit cover reporting, because the ecosystem already reads them. *"Record this outcome
+against case 865914 in plan 764570"* has no interchange format, so it needs real code — and this is
+the **one** place a bespoke adapter is justified.
+
+```bash
+nightbark sink:ado --org <o> --project <p> --plan <id> --case <id> [--suites a,b]
+```
+
+**Read-only without `--arm`.** It resolves each case to its test point(s) and tells you whether the
+scope matches anything at all.
+
+⚠️ **That read-only mode is the point of the command.** The failure it exists for is a scope that has
+gone *stale*: the plan gets reorganised, the scoped suite ids stop matching any test point, and the
+publish reports every case as a tick **while writing nothing**. There is no way to see that in a
+normal run's output, so *"it ran green"* is not evidence anything was recorded. Run the check first.
+
+Five behaviours the interface mandates of any adapter, because each one has bitten somebody:
+
+| | |
+| --- | --- |
+| **Dry run by default** | Test-management systems have no undo |
+| ⛔ **Zero matches is a FAILURE** | Not a clean run. This is the stale-fence defect, and it is the reason the interface specifies behaviour rather than just method names |
+| **Distinguish 401 / 403 / 404** | Expired token, missing permission, wrong plan — three different fixes. ADO also answers 404 for a plan you cannot *see*, so that message says it may be permissions wearing a 404 |
+| **Paginate** | Page one always looks complete |
+| **Never invent an id** | Publishing to a guessed point is worse than publishing nothing, because somebody will believe it |
+
+### ⚠️ Contract-tested, NOT live-verified
+
+17 tests run the adapter against a stub implementing the documented REST shapes. That proves URL
+construction, the PAT encoding (Basic auth with an *empty* username — the colon is required), the
+pagination loop, error discrimination, idempotent linking, and that a zero-match publish fails
+loudly.
+
+It has **not** been run against a live Azure DevOps instance. What a stub cannot prove: that a
+particular plan has particular suites, that permissions are right, or your org's API quirks.
+
+One command settles it, for whoever has access:
+
+```bash
+AZURE_TOKEN=<pat> nightbark sink:ado --org <o> --project <p> --plan <id> --case <id>
+```
+
+Read-only, so there is nothing to undo if it is wrong.
+
+⚠️ One behaviour is worth knowing even before that: an **empty** token is refused up front rather
+than sent. Azure answers an unauthenticated call with **203 and an HTML sign-in page**, not a 401 —
+parsed naively that becomes an empty result set, and the caller reports a clean run against a plan it
+never reached.
+
 ## Installing
 
 ```bash
@@ -187,7 +238,7 @@ beats four that are not, and saying so is cheaper than discovering it later.
 | 1 | `audit` + the vacuity Irregular + Moriarty, read-only, against **any** Playwright repo | ✅ done |
 | 2 | `nightbark init` — scaffold carrying the disciplines as structure | ✅ done |
 | 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | ✅ done |
-| 4 | `TestCaseSink` interface + ADO Test Plans adapter (Jira / Confluence contract-tested) | |
+| 4 | `TestCaseSink` interface + ADO Test Plans adapter | ✅ done (contract-tested) |
 | 5 | Installable package | ✅ done |
 
 Phase 1 deliberately comes before the scaffold: it works against suites that **already exist**, so it
