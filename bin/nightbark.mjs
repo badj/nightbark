@@ -6,6 +6,7 @@ import { toSarif } from '../src/report/sarif.mjs';
 import { candidates } from '../src/irregulars/vacuity.mjs';
 import { brief } from '../src/irregulars/brief.mjs';
 import { challenge } from '../src/irregulars/challenge.mjs';
+import { mergeVerdicts } from '../src/irregulars/verdict.mjs';
 import { readFileSync } from 'node:fs';
 import { selftest } from '../src/selftest.mjs';
 import { selfcheck } from '../src/selfcheck.mjs';
@@ -41,6 +42,55 @@ if (cmd === 'brief') {
     if (out) { writeFileSync(out, text); console.log(`\n  brief written: ${out}  (${found.length} candidate(s))\n`); }
     else console.log(text);
     process.exit(0);
+}
+
+if (cmd === 'verdict') {
+    // nightbark verdict <repo> --answers a.json --verdicts v.json [--sarif out.json]
+    const target = resolve(rest.find((a) => !a.startsWith('--') && a !== 'verdict') ?? process.cwd());
+    const read = (p, what) => {
+        try { const j = JSON.parse(readFileSync(p, 'utf8')); if (!Array.isArray(j)) throw new Error('expected a JSON array'); return j; }
+        catch (err) { console.log(`\n  cannot read ${what}: ${err.message}\n`); process.exit(1); }
+    };
+    const answersPath = flag('answers');
+    if (!answersPath) { console.log('\n  usage: nightbark verdict <repo> --answers a.json [--verdicts v.json] [--sarif out.json]\n'); process.exit(1); }
+    const answers = read(answersPath, 'answers');
+    const verdictsPath = flag('verdicts');
+    const verdicts = verdictsPath ? read(verdictsPath, 'verdicts') : [];
+
+    const found = candidates(target);
+    const known = new Set(found.map((c) => c.id));
+    const ghosts = [...answers, ...verdicts].filter((a) => !known.has(a.id)).map((a) => a.id);
+    if (ghosts.length) {
+        console.log(`\n  \u26a0\ufe0f  ${ghosts.length} entr(y/ies) name an id that is not a candidate — refusing:`);
+        for (const g of [...new Set(ghosts)].slice(0, 5)) console.log(`      ${g}`);
+        console.log('');
+        process.exit(1);
+    }
+
+    const { findings, stats } = mergeVerdicts({ candidates: found, answers, verdicts });
+    console.log(`\n  nightbark verdict — ${target}`);
+    console.log(`  ${found.length} candidate(s) · judge: ${stats.established} established, ${stats.uncertain} uncertain`);
+    console.log(`  Moriarty: ${stats.confirmed ?? 0} confirmed, ${stats.downgraded ?? 0} downgraded, ${stats.dropped ?? 0} dropped`
+              + (stats.unreviewed ? `, \u26a0\ufe0f ${stats.unreviewed} UNREVIEWED` : ''));
+    if (!verdictsPath) console.log('  \u26a0\ufe0f  No --verdicts given: nothing has been adversarially reviewed, so no claim is reportable as a defect.');
+    console.log('');
+
+    for (const f of findings) {
+        console.log(`  [${f.severity}] ${f.file}:${f.line}  (${f.verdict})`);
+        console.log(`      ${f.excerpt}`);
+        console.log(`      ${f.message.slice(0, 400)}`);
+        console.log('');
+    }
+    const sarif = flag('sarif');
+    if (sarif) {
+        writeFileSync(sarif, JSON.stringify(toSarif({ findings, root: target, gatesRun: [] }), null, 2));
+        console.log(`  SARIF written: ${sarif}  (${findings.length} result(s))\n`);
+    }
+    const RANK = { note: 1, warning: 2, error: 3 };
+    const failOn = flag('fail-on') ?? 'error';
+    const breaching = findings.filter((f) => (RANK[f.severity] ?? 0) >= (RANK[failOn] ?? 99));
+    console.log(`  ${findings.length} reportable finding(s) · exit policy --fail-on ${failOn} -> ${breaching.length} breaching\n`);
+    process.exit(breaching.length ? 1 : 0);
 }
 
 if (cmd === 'challenge') {
@@ -155,6 +205,7 @@ console.log(`
     nightbark selfcheck           enforce ADR-0001 on THIS repo - no client content
     nightbark brief vacuity <p>   gather candidates + context for the vacuity Irregular
     nightbark challenge <p> <a>   Moriarty: attack the findings a judge returned
+    nightbark verdict <p> ...     merge judge + Moriarty into findings (--sarif, --fail-on)
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);

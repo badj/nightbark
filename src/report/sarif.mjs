@@ -1,4 +1,5 @@
 import { gates } from '../gates/index.mjs';
+import { irregulars } from '../irregulars/index.mjs';
 
 /**
  * SARIF 2.1.0 output.
@@ -29,6 +30,11 @@ export function toSarif({ findings, root, gatesRun = [] }, { version = '0.0.0' }
     // not attempted — and "the rule exists" reading as "the rule was checked" is the same category
     // of mistake this tool reports elsewhere.
     const ran = gates.filter((g) => gatesRun.includes(g.id));
+    // ⚠️ An Irregular's findings carry a ruleId too, and a result pointing at a ruleId with no
+    // matching rule is invalid SARIF — GitHub ingests it and silently shows nothing, which is a dog
+    // that did not bark inside the serialiser. Include any Irregular that actually produced a result.
+    const usedIrregulars = irregulars.filter((ir) => findings.some((f) => f.gateId === ir.id));
+    const allRules = [...ran, ...usedIrregulars];
 
     return {
         $schema: SCHEMA,
@@ -39,13 +45,13 @@ export function toSarif({ findings, root, gatesRun = [] }, { version = '0.0.0' }
                     name: 'nightbark',
                     semanticVersion: version,
                     informationUri: 'https://github.com/badj/nightbark',
-                    rules: ran.map((g) => ({
+                    rules: allRules.map((g) => ({
                         id: g.id,
                         name: g.id.replace(/-(\w)/g, (_, c) => c.toUpperCase()),
                         shortDescription: { text: g.title },
                         fullDescription: { text: g.why },
                         defaultConfiguration: { level: g.severity },
-                        properties: { kind: g.kind ?? 'file', scope: g.scope ?? 'test-code' },
+                        properties: { kind: g.kind ?? 'file', scope: g.scope ?? 'test-code', origin: usedIrregulars.includes(g) ? 'irregular' : 'gate' },
                     })),
                 },
             },
@@ -64,7 +70,7 @@ export function toSarif({ findings, root, gatesRun = [] }, { version = '0.0.0' }
                         },
                     },
                 }],
-                properties: { origin: f.origin },
+                properties: { origin: f.origin, ...(f.verdict ? { verdict: f.verdict } : {}) },
             })),
         }],
     };

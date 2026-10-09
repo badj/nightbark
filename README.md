@@ -44,6 +44,34 @@ project and it was arrived at by experiment, not taste.
 **Moriarty** — the adversarial pass. Every finding an Irregular raises gets attacked before it is
 reported, because a confident wrong finding costs more trust than a missed one.
 
+## The loop
+
+Gates are deterministic and need nothing. The Irregular adds judgement, and **Moriarty decides what
+you actually read** — measured, that is the difference between 33% and 100% precision.
+
+```
+nightbark audit <repo> --sarif out.json          # gates only. No model, no key, no network.
+
+nightbark brief vacuity <repo> --out brief.md    # candidates + context + resolved locators
+  → any agent judges each: established | absent | uncertain          → answers.json
+nightbark challenge <repo> answers.json --out challenge.md
+  → Moriarty attacks each claim: confirmed | downgraded | dropped    → verdicts.json
+nightbark verdict <repo> --answers answers.json --verdicts verdicts.json --sarif out.json
+```
+
+What reaches a reader:
+
+| Verdict | Reported as |
+| --- | --- |
+| `confirmed` | **warning** — survived an attack |
+| `downgraded` | **note** — says plainly it needs a human read |
+| `dropped` | **nothing.** Moriarty broke it; nobody should spend a minute on it |
+| no verdict | **note, flagged UNREVIEWED** — ⚠️ skipped is not the same as cleared |
+
+That last row is deliberate. Silently dropping an unreviewed claim would make an *incomplete*
+adversarial pass indistinguishable from a clean one, which is the exact defect shape this tool is
+named after.
+
 ## Usage
 
 ```bash
@@ -53,6 +81,7 @@ nightbark audit <path> --sarif out.json  # SARIF 2.1.0 for CI annotation
 nightbark audit <path> --fail-on warning # exit policy: error (default) | warning | note | never
 nightbark selftest                     # prove every gate can fire, and is specific
 nightbark selfcheck                    # enforce ADR-0001 on this repo — no client content
+nightbark verdict <path> --answers a.json --verdicts v.json   # merge into findings + SARIF
 npm run selftest                       # the above, plus the output-format tests
 ```
 
@@ -107,6 +136,35 @@ targets the gates were not written against.
 | `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
 | `cypress-realworld-app` (Cypress) | 170 | 2 | 2 | 100% |
 | **a 217-file production suite** (Playwright + BDD) | 217 | 26 | 22 | **85%** |
+
+### The Irregular, measured
+
+| | Findings | True | Precision |
+| --- | --- | --- | --- |
+| Judge alone | 3 | 1 | **33%** |
+| Judge + Moriarty | 1 | 1 | **100%** |
+
+Moriarty **dropped one** claim and **downgraded another**. Without the adversarial pass this
+Irregular would have shipped two wrong findings on its first run — and a reader sent to rewrite two
+correct tests does not open the report a third time.
+
+The one confirmed finding is a class **no gate could reach**:
+
+```ts
+if (page.url() === "/") {            // page.url() is ABSOLUTE — never "/"
+  expect(hasScriptTag).toBeFalsy();  // unreachable
+}
+```
+
+No `else` branch, so a test named *"should handle special characters in registration"* asserts
+nothing on any path. Moriarty refuted its own best escape hatch from inside the same file — a sibling
+test writes `new URL("/", page.url())`, which is only meaningful if the URL is absolute — and then
+**upgraded the headline** from "absent premise" to "unreachable guard, test asserts nothing", because
+that is independently verifiable and the fix is one line.
+
+Locator resolution closed the gap Moriarty named: **8/8** locators resolved on the demo target and
+**8/9** on a 217-file production BDD suite (up from 0/9), tracing through nested components,
+inheritance, interface aggregates, getters, locator-returning methods and one-hop locals.
 
 ### The production suite is where it earned its keep
 
