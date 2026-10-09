@@ -419,7 +419,8 @@ if (page.url() === "/") {            // page.url() is ABSOLUTE — never "/"
 No `else` branch, so a test named *"should handle special characters in registration"* asserts
 nothing on any path. Moriarty refuted its own best escape hatch from inside the same file — a sibling
 test writes `new URL("/", page.url())`, which is only meaningful if the URL is absolute — then
-**upgraded the headline** from "absent premise" to "unreachable guard, test asserts nothing", because
+**upgraded the headline** from "absent premise" to "unreachable guard, test asserts nothing" — via the
+adversarial pass's optional `headline` field, because
 that is independently verifiable and the fix is one line.
 
 Locator resolution closed the gap Moriarty named by name: **8/8** locators resolved on the demo

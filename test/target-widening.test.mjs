@@ -255,3 +255,46 @@ test('a declared count that does not match FAILS the proof, with a direction', a
         victim.fixtures.expect = real;
     }
 });
+
+// ── Moriarty's headline ────────────────────────────────────────────────────────────────────────
+
+test('⛔ Moriarty may REPLACE the headline — the README claimed this before the code allowed it', async () => {
+    // The default headline can be factually wrong about a finding Moriarty confirmed. Measured on a
+    // real target: an XSS test guarded by `if (page.url() === "/")`, which can never be true. The
+    // defect is the unreachable branch; "would pass even if the element never existed" sends the
+    // reader after the element, which is irrelevant.
+    const { mergeVerdicts } = await import('../src/irregulars/verdict.mjs');
+    const candidates = [{ id: 'a.spec.ts:1#falsy', file: 'a.spec.ts', line: 1, excerpt: 'expect(x).toBeFalsy();' }];
+    const answers = [{ id: 'a.spec.ts:1#falsy', premise: 'absent', evidence: 'nothing establishes it' }];
+
+    const sharpened = mergeVerdicts({
+        candidates, answers,
+        verdicts: [{
+            id: 'a.spec.ts:1#falsy', verdict: 'confirmed', attack: 'tried X', why_it_survives_or_not: 'X fails',
+            headline: 'unreachable guard: the branch can never be entered',
+        }],
+    });
+    assert.match(sharpened.findings[0].message, /^unreachable guard: the branch can never be entered/);
+
+    // Omitted, blank and whitespace-only all fall back to the default rather than emitting nothing.
+    for (const v of [{}, { headline: '' }, { headline: '   ' }]) {
+        const r = mergeVerdicts({
+            candidates, answers,
+            verdicts: [{ id: 'a.spec.ts:1#falsy', verdict: 'confirmed', attack: 'a', why_it_survives_or_not: 'b', ...v }],
+        });
+        assert.match(r.findings[0].message, /^premise not established/, `fallback failed for ${JSON.stringify(v)}`);
+    }
+});
+
+test('the challenge brief TELLS Moriarty the field exists — a capability nobody knows about is none', async () => {
+    // It was added to verdict.mjs first and the brief still did not mention it, so no judge would
+    // ever have supplied it. Both halves or neither.
+    const { challenge } = await import('../src/irregulars/challenge.mjs');
+    const out = challenge(
+        [{ id: 'a.spec.ts:1#falsy', file: 'a.spec.ts', line: 1, kind: 'falsy', excerpt: 'expect(x).toBeFalsy();', test: 't' }],
+        [{ id: 'a.spec.ts:1#falsy', premise: 'absent', evidence: 'nothing' }],
+        { target: 'x' },
+    );
+    assert.match(out, /"headline"/, 'the JSON schema must offer the field');
+    assert.match(out, /optional, and worth using when the default framing misdescribes/, 'and say when to use it');
+});

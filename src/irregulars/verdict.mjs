@@ -53,9 +53,23 @@ export function mergeVerdicts({ candidates, answers, verdicts }) {
         stats[v.verdict] = (stats[v.verdict] ?? 0) + 1;
         if (!severity) continue;        // dropped: Moriarty broke it, so nobody should read it
 
-        const head = v.verdict === 'confirmed'
-            ? 'premise not established — this assertion would pass even if the element never existed'
-            : 'premise could not be settled from the code — needs a human read';
+        // ⛔ MORIARTY MAY REPLACE THE HEADLINE, and this is not a nicety — the README claimed it
+        // could for days before the code allowed it, which made the showcase example an unbacked
+        // claim about the tool's own behaviour.
+        //
+        // It matters because the generic headline can be FACTUALLY WRONG about a finding Moriarty
+        // confirmed. Measured on a real target: an XSS test guarded by `if (page.url() === "/")`,
+        // which can never be true because page.url() is absolute. The defect is that the branch
+        // never executes; the generic text says "would pass even if the element never existed",
+        // which is not the problem — the element's existence is irrelevant. A reader handed that
+        // headline goes looking for the wrong thing.
+        //
+        // Sharpening a confirmed finding's headline is exactly what an adversarial pass is for, so
+        // the schema now offers the field and this uses it when supplied.
+        const head = v.headline?.trim()
+            || (v.verdict === 'confirmed'
+                ? 'premise not established — this assertion would pass even if the element never existed'
+                : 'premise could not be settled from the code — needs a human read');
         findings.push(finding(c, severity, head, a, v));
     }
 

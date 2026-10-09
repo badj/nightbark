@@ -78,7 +78,8 @@ Return **only** this JSON:
     "id": "<candidate id, copied exactly>",
     "verdict": "confirmed" | "dropped" | "downgraded",
     "attack": "the strongest argument that the finding is wrong",
-    "why_it_survives_or_not": "why that argument does or does not hold, given only what was shown"
+    "why_it_survives_or_not": "why that argument does or does not hold, given only what was shown",
+    "headline": "OPTIONAL \u2014 a replacement one-line headline. Omit unless the default framing is wrong."
   }
 ]
 \`\`\`
@@ -87,6 +88,11 @@ Return **only** this JSON:
 - **\`dropped\`** — the attack holds. The finding is wrong and must not be reported.
 - **\`downgraded\`** — the attack neither holds nor fails on the material shown. Report as *needs a
   human read*, not as a defect.
+- **\`headline\`** \u2014 optional, and worth using when the default framing misdescribes what you
+  actually established. The default reads *"this assertion would pass even if the element never
+  existed"*; if what you confirmed is sharper \u2014 an unreachable branch, a swallowed error, a guard
+  that cannot fail \u2014 say THAT instead. A reader handed the wrong headline investigates the wrong
+  thing, and an independently verifiable headline beats a correct verdict with a vague one.
 
 ⚠️ **Dropping findings is a success, not a failure.** You are the last thing between a wrong finding
 and an engineer's afternoon. If you confirm everything you have done nothing.
