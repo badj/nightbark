@@ -106,6 +106,123 @@ The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing d
 
 ## Status
 
+**Tier 1 complete** — 3 gates, 1 Irregular with an adversarial pass, SARIF, exit policy, and
+ADR-0001 enforced by a self-check. 95% precision across 493 files of four real repositories, every
+finding hand-triaged. See [docs/TIER-1.md](docs/TIER-1.md).
+
+⚠️ One Tier-1 criterion is deliberately NOT met: it asked for four Irregulars, and one is shipped.
+Two of the four intended shapes were pushed from gate to agent by measurement, and a third
+(traceability) has **no field data** in any public target — building it would mean a second
+fixture-only component and would make the figure above misleading. One Irregular that is proven
+beats four that are not, and saying so is cheaper than discovering it later.
+
+| Phase | Ships | State |
+| --- | --- | --- |
+| 0 | Repo, licence, ADRs, definition of done | ✅ done |
+| 1 | `audit` + the vacuity Irregular + Moriarty, read-only, against **any** Playwright repo | ✅ done |
+| 2 | `nightbark init` — scaffold carrying the disciplines as gates | |
+| 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | |
+| 4 | `TestCaseSink` interface + ADO Test Plans adapter (Jira / Confluence contract-tested) | |
+| 5 | Installable package | |
+
+Phase 1 deliberately comes before the scaffold: it works against suites that **already exist**, so it
+is useful on day one of a contract with no migration, and the judgement is the part worth carrying.
+
+## Licence
+
+MIT © JJ (Jacob) Badenhorst
+
+## Precision
+
+The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. **Every finding below was
+hand-triaged**, on targets the gates were not written against.
+
+| Target | Files read | Findings | True | Precision |
+| --- | --- | --- | --- | --- |
+| `testmart-parallel-demo` (Playwright) | 77 | 15 | 15 | 100% |
+| `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
+| `cypress-realworld-app` (Cypress) | 170 | 2 | 2 | 100% |
+| a 217-file production suite (Playwright + BDD) | 217 | 25 | 23 | 92% |
+| **total** | **493** | **42** | **40** | **95%** |
+
+Per gate:
+
+| Gate | Findings | True | Precision | Note |
+| --- | --- | --- | --- | --- |
+| `fixed-wait` | 31 | 31 | **100%** | the workhorse — fixed sleeps appear even in careful code |
+| `serialised-suite` | 8 | 8 | **100%** | ⚠️ 4 cite a reason the suite's own notes record as superseded |
+| `shared-test-identity` | 3 | 1 | **33%** | reports as a `note` for exactly this reason |
+
+### The Irregular, measured separately
+
+| | Findings | True | Precision |
+| --- | --- | --- | --- |
+| Judge alone | 3 | 1 | **33%** |
+| Judge + Moriarty | 1 | 1 | **100%** |
+
+Moriarty **dropped one** claim and **downgraded another**. Without the adversarial pass this
+Irregular would have shipped two wrong findings on its first run — and a reader sent to rewrite two
+correct tests does not open the report a third time.
+
+The one confirmed finding is a class **no gate could reach**:
+
+```ts
+if (page.url() === "/") {            // page.url() is ABSOLUTE — never "/"
+  expect(hasScriptTag).toBeFalsy();  // unreachable
+}
+```
+
+No `else` branch, so a test named *"should handle special characters in registration"* asserts
+nothing on any path. Moriarty refuted its own best escape hatch from inside the same file — a sibling
+test writes `new URL("/", page.url())`, which is only meaningful if the URL is absolute — then
+**upgraded the headline** from "absent premise" to "unreachable guard, test asserts nothing", because
+that is independently verifiable and the fix is one line.
+
+Locator resolution closed the gap Moriarty named by name: **8/8** locators resolved on the demo
+target, **8/9** on the production BDD suite (up from 0/9), tracing through nested components,
+inheritance, interface aggregates, getters, locator-returning methods and one-hop locals.
+
+### What it cost: thirteen rounds of red/green, every failure mine
+
+| Found by | Count | Examples |
+| --- | --- | --- |
+| A `silent` fixture, before any real code | 3 | a matcher matched inside a **string literal**; a `setTimeout` **definition** read as a call; `appliesTo` rejecting its own fixture |
+| First contact with a real repo | 6 | a **React component** whose sleep was deliberate; a textbook **bounded poll** — the pattern the gate's own advice recommends; a **not-found probe** read as a shared account |
+| The production suite | 4 | **wiki page ids** read as phone numbers (9 false positives of 20); boundary and wrong-locale **probes**; a number inside a **diagnostic string**; `waitForTimeout` as a **poll interval** — *the same bug already fixed on the other branch and not swept for* |
+
+⚠️ **And one leak of my own.** Documenting the page-id defect, I pasted a real client page id into
+this README — and then into a gate comment. The `selfcheck` I wrote to enforce
+[ADR-0001](docs/adr/0001-no-client-code.md) **missed it**, because it matched `@ado_123456` notation
+and not a bare digit run in a URL path. Fixed the leak, added the shape rule, and the new rule
+immediately found the second copy I had not noticed. Never committed.
+
+### ⚠️ `shared-test-identity` is demoted, on evidence
+
+12% precision on first contact; 33% after seven rounds of noise rules. Below the bar this project set
+itself, so it reports as a `note` that asks a question rather than an `error` that declares a defect.
+Three populations are indistinguishable on the line — a **managed** pool handed out per worker behind
+a lock (correct), a **probe** value reused deliberately (coverage), and a **raw** hard-coded account
+(the defect) — and only the surrounding mechanism separates them.
+
+Its one genuine finding is the design brief for turning it into an Irregular: a spare value **defined
+as a constant beside a pool it was not part of**. An allocator existed and this value sat outside it;
+the suite's own notes record it causing a real concurrent-run failure. *Shared **and** outside the
+allocator that exists* is a far sharper signal than *shared*.
+
+## Decisions
+
+The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing direction:
+
+| | |
+| --- | --- |
+| [ADR-0001](docs/adr/0001-no-client-code.md) | No client code, ever. Patterns re-expressed from scratch |
+| [ADR-0002](docs/adr/0002-gates-not-prose.md) | A discipline ships as a gate or an auditor, never as prose |
+| [ADR-0003](docs/adr/0003-targets-and-app-under-test.md) | What we audit, and the app we scaffold against |
+| [ADR-0004](docs/adr/0004-where-the-smarts-live.md) | Gates first; agents only where judgement is required |
+| [INTEGRATIONS](docs/INTEGRATIONS.md) | Emit SARIF / JUnit / exit codes — don't build connectors |
+
+## Status
+
 Pre-alpha. Phase 0 (decisions) complete. See [docs/TIER-1.md](docs/TIER-1.md) for what "done" means
 for the first shippable slice.
 

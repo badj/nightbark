@@ -15,3 +15,8 @@ test('one spec owning one address is fine', async ({ page }) => {
   await page.getByLabel('Email').fill('solo.user@testmart.io');
   await expect(page.getByLabel('Email')).toHaveValue('solo.user@testmart.io');
 });
+
+/** "021 018 24964" / "02101824964" / "+64 21 018 24964" → normalised to 64… */
+export function normalise(msisdn: string): string {
+  return msisdn.replace(/\D/g, '').replace(/^0/, '64');
+}

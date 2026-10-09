@@ -132,7 +132,12 @@ export default validateGate({
  */
 function isNoise(line) {
     const l = line.trim();
-    if (l.startsWith('//') || l.startsWith('*') || l.startsWith('#')) return true;
+    // ⚠️ `/**` and `/*` were MISSED by the original list, which only had `//`, `*` and `#`. A JSDoc
+    // OPENING line is the commonest place to document format variants of a value:
+    //     /** "021 018 24964" / "02101824964" / "+64 21 …" -> 64… */
+    // and that cost a false positive on a real suite. The continuation lines were caught; only the
+    // first was not, which is exactly the kind of near-miss a list of prefixes invites.
+    if (/^(?:\/\/|\/\*|\*|#)/.test(l)) return true;
     // A line holding several addresses is a table of inputs, not one account in use.
     if ((l.match(EMAIL)?.length ?? 0) > 1) return true;
     // Explicitly negative test data.
