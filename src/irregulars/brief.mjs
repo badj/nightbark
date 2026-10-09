@@ -87,6 +87,7 @@ function renderCandidate(c, i) {
         ? `\n**Shared setup in the same file** (a premise is often established here):\n\n\`\`\`\n${clip(c.sharedSetup, 40)}\n\`\`\`\n`
         : '\n_No shared setup found in this file._\n';
 
+    const locs = (c.locators ?? []).length ? renderLocators(c.locators) : '';
     return `## Candidate ${i + 1} — \`${c.id}\`
 
 - **kind:** ${c.kind}
@@ -105,7 +106,7 @@ ${c.assertionVerbatim && c.assertion !== c.assertionVerbatim ? `\n_Joined across
 \`\`\`
 ${clip(c.testBody, 80)}
 \`\`\`
-${setup}`;
+${setup}${locs}`;
 }
 
 /** Keep a block readable. A judge given an unbounded file drifts off the question it was asked. */
@@ -113,4 +114,37 @@ function clip(lines, max) {
     if (lines.length <= max) return lines.join('\n');
     const head = lines.slice(0, max - 10).join('\n');
     return `${head}\n… (${lines.length - max + 10} more lines omitted)`;
+}
+
+/**
+ * Where each asserted locator is DEFINED, and everywhere else it is asserted on.
+ *
+ * ⚠️ This section exists because an adversarial reviewer named its absence as the biggest structural
+ * push toward wrongly confirming a finding. Two of three claims in the first run were undecidable
+ * purely because locators arrived as names.
+ *
+ * The `asserted elsewhere` list is the part that does the work: a POSITIVE assertion on the same
+ * locator in a neighbouring test proves the selector resolves, which disposes of the stale-selector
+ * risk that is usually such a finding's only real substance. And an `unresolved` entry is itself
+ * information — it says the premise CANNOT be settled from code, which means `uncertain`, not a
+ * confident verdict either way.
+ */
+function renderLocators(locators) {
+    const body = locators.map((l) => {
+        if (l.status !== 'resolved') {
+            return `- \`${l.expr}\` — ⚠️ **could not be resolved**: ${l.reason}\n`
+                 + `  _Treat a premise that rests on this as \`uncertain\`: it cannot be settled from the code._`;
+        }
+        const hops = l.hops?.length ? ` (via ${l.hops.map((h) => `${h.property} → ${h.to}`).join(', ')})` : '';
+        const inh = l.inheritedFrom ? ` — inherited from \`${l.inheritedFrom}\`` : '';
+        const root = l.dependsOn?.length
+            ? l.dependsOn.map((d) => `\n    - rooted on \`${d.property}\`: \`${d.definition.join(' ').trim().replace(/^this\.\w+\s*=\s*/, '')}\``).join('')
+            : '\n    - built directly off `page` (not scoped to any parent element)';
+        const live = l.alsoAssertedAt?.length
+            ? l.alsoAssertedAt.map((a) => `\n    - ${a}`).join('')
+            : '\n    - ⚠️ **asserted nowhere else in the suite** — nothing independently proves this selector resolves';
+        return `- \`${l.expr}\` → \`${l.className}\`${hops}${inh}, defined at \`${l.file}:${l.line}\`\n`
+             + `\n    \`\`\`\n    ${l.definition.join('\n    ').trim()}\n    \`\`\`${root}\n  **Asserted elsewhere:**${live}`;
+    }).join('\n\n');
+    return `\n**Where the asserted locators are defined:**\n\n${body}\n`;
 }

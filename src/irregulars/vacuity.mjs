@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { walk, looksLikeTestCode } from '../runner.mjs';
+import { buildIndex, resolveLocator, locatorExpressions } from './locators.mjs';
 
 /**
  * The vacuity Irregular — candidate finder.
@@ -47,8 +48,11 @@ const GHERKIN_SCENARIO = /^\s*Scenario(?:\s+Outline)?\s*:\s*(.+)$/;
 const GHERKIN_BACKGROUND = /^\s*Background\s*:/;
 const HOOK_START = /^\s*(?:beforeEach|beforeAll|before)\s*\(/;
 
-export function candidates(root, { max = 200 } = {}) {
+export function candidates(root, { max = 200, resolveLocators = true } = {}) {
     const out = [];
+    // One index for the whole run. Moriarty named withholding page objects as the biggest push
+    // toward wrongly confirming a finding, so resolution is ON by default, not an opt-in.
+    const index = resolveLocators ? buildIndex(root) : null;
 
     for (const file of walk(root)) {
         let text;
@@ -82,6 +86,12 @@ export function candidates(root, { max = 200 } = {}) {
                     testBody: block ? lines.slice(block.start, block.end + 1) : [line],
                     sharedSetup: shared,
                     question: q,
+                    // The locator, traced to where it is DEFINED — plus every other place it is
+                    // asserted on, which is what settles "is this selector even live?".
+                    locators: index
+                        ? locatorExpressions(line, block ? lines.slice(block.start, block.end + 1) : [])
+                            .map((e) => resolveLocator(index, e))
+                        : [],
                 });
                 break;  // one candidate per line; the first shape that matches names it
             }
