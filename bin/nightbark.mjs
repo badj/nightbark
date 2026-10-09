@@ -7,6 +7,7 @@ import { candidates } from '../src/irregulars/vacuity.mjs';
 import { brief } from '../src/irregulars/brief.mjs';
 import { challenge } from '../src/irregulars/challenge.mjs';
 import { mergeVerdicts } from '../src/irregulars/verdict.mjs';
+import { init } from '../src/init/index.mjs';
 import { readFileSync } from 'node:fs';
 import { selftest } from '../src/selftest.mjs';
 import { selfcheck } from '../src/selfcheck.mjs';
@@ -27,6 +28,36 @@ if (cmd === 'selftest') {
         console.log('  "fires" failing = the gate cannot fail. "silent" failing = the gate is too greedy.\n');
     }
     process.exit(bad.length ? 1 : 0);
+}
+
+if (cmd === 'init') {
+    const dir = rest.find((a) => !a.startsWith('--') && a !== 'init');
+    if (!dir) { console.log('\n  usage: nightbark init <dir> [--base-url http://localhost:3000] [--force]\n'); process.exit(1); }
+    try {
+        const { target, name, files } = init(dir, {
+            baseURL: flag('base-url') ?? 'http://localhost:3000',
+            force: rest.includes('--force'),
+        });
+        console.log(`\n  scaffolded ${name} -> ${target}\n`);
+        for (const f of files) console.log(`      ${f}`);
+        console.log(`
+  Next:
+      cd ${dir}
+      npm install && npx playwright install chromium
+      npm test            # one test FAILS to be found by the audit, see below
+      npm run audit       # nightbark flags tests/vacuous.spec.ts
+
+  \u26a0\ufe0f  Two things need your attention before this suite is honest:
+      1. tests/fixtures/pool.ts - release() is a STUB. Until it is wired up your suite
+         accumulates state, and the second run of the day fails on data the first left behind.
+      2. tests/vacuous.spec.ts is deliberately broken. Fix it, watch the finding disappear,
+         then delete it.
+`);
+        process.exit(0);
+    } catch (err) {
+        console.log(`\n  ${err.message}\n`);
+        process.exit(1);
+    }
 }
 
 if (cmd === 'brief') {
@@ -199,6 +230,7 @@ if (cmd === 'audit') {
 console.log(`
   nightbark — finds the tests that did not bark
 
+    nightbark init <dir>          scaffold a suite whose disciplines are structural
     nightbark audit [path]        run the gates over a repo (read-only)
     nightbark audit --gate <id>   run one gate
     nightbark selftest            prove every gate can fire, and is specific

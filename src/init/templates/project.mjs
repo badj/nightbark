@@ -1,0 +1,183 @@
+import { POOL_SIZE } from '../constants.mjs';
+
+export const playwrightConfigTs = (baseURL) => `import { defineConfig, devices } from '@playwright/test';
+import { POOL } from './tests/fixtures/pool';
+
+/**
+ * Every default here is argued for. Change them deliberately, not by habit.
+ */
+export default defineConfig({
+    testDir: './tests',
+
+    // Parallel by default. Serialising is how a shared-fixture race gets WORKED AROUND rather than
+    // fixed: the flake disappears, the cause remains, and every run thereafter pays the full serial
+    // duration. If you reach for \`false\`, fix the sharing instead — and if you still need it, write
+    // down WHY, because that reason is the thing that rots once the cause is gone.
+    fullyParallel: true,
+
+    // ⚠️ HARD CEILING. More workers than reserved identities means two workers sharing one, which is
+    // the defect the pool exists to prevent, surfacing as a failure in whichever test arrived
+    // second. tests/fixtures/pool.ts throws as a backstop if this is overridden on the CLI.
+    workers: POOL.length,
+
+    // Zero on purpose. A retry turns a real intermittent defect into a green run plus a note nobody
+    // reads. Let flakiness surface, then fix the cause — and if you must retry, do it for one run to
+    // gather evidence rather than as a standing setting.
+    retries: 0,
+
+    // Fail the run if a test is left focused. \`test.only\` committed by accident silently reduces a
+    // suite to one test, and the run is green.
+    forbidOnly: !!process.env.CI,
+
+    reporter: process.env.CI ? [['github'], ['list']] : [['list']],
+
+    use: {
+        baseURL: process.env.BASE_URL ?? '${baseURL}',
+        trace: 'retain-on-failure',
+        screenshot: 'only-on-failure',
+    },
+
+    projects: [
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    ],
+});
+`;
+
+export const packageJson = (name) => JSON.stringify({
+    name,
+    private: true,
+    type: 'module',
+    scripts: {
+        test: 'playwright test',
+        // The audit is a script, not a README suggestion. --fail-on error so a first run cannot red
+        // somebody's pipeline on day one; tighten it once the output has earned trust.
+        audit: 'npx github:badj/nightbark audit . --fail-on error',
+        selftest: 'playwright test --list >/dev/null && echo "specs collect cleanly"',
+    },
+    // ⚠️ @types/node is NOT optional: tsconfig declares types:['node'] for process.env, and
+    // without it a freshly scaffolded project fails `tsc --noEmit` on its very first run — which
+    // makes the scaffold look broken before anybody has written a line. Found by actually running
+    // npm install and tsc on the output rather than assuming it was fine.
+    devDependencies: { '@playwright/test': '^1.49.0', '@types/node': '^22.0.0', typescript: '^5.6.0' },
+}, null, 4) + '\n';
+
+export const tsconfigJson = () => JSON.stringify({
+    compilerOptions: {
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+        strict: true,
+        noEmit: true,
+        skipLibCheck: true,
+        types: ['node'],
+    },
+    include: ['tests', 'playwright.config.ts'],
+}, null, 4) + '\n';
+
+export const gitignore = () => `node_modules/
+test-results/
+playwright-report/
+*.sarif
+.DS_Store
+`;
+
+/** The honest example: uses the allocator, and asserts a premise before a negative. */
+export const exampleSpecTs = () => `import { test, expect } from './fixtures';
+
+/**
+ * The shape to copy.
+ *
+ * Two things it does that are easy to skip:
+ *   1. It never names an identity — it takes one from the fixture, so it is parallel-safe and
+ *      re-runnable by construction rather than by discipline.
+ *   2. It ESTABLISHES A PREMISE before asserting an absence. \`toBeHidden()\` is also true of an
+ *      element that never existed, so without the positive assertion first it would pass against a
+ *      blank page, a renamed selector or a 404.
+ */
+test('the sign-in form accepts an allocated identity', async ({ page, identity }) => {
+    await page.goto('/');
+
+    const form = page.getByRole('form').or(page.locator('form')).first();
+    // ⚠️ The premise. Without this line the negative assertion below proves nothing.
+    await expect(form).toBeVisible();
+
+    const email = page.getByLabel(/e-?mail/i).first();
+    await expect(email).toBeVisible();
+    await email.fill(identity.email);
+    await expect(email).toHaveValue(identity.email);
+});
+`;
+
+/**
+ * The deliberately-vacuous test.
+ *
+ * A scaffold that ships entirely green teaches nothing about what the tool is for. This one passes
+ * and proves nothing, and \`npm run audit\` says so — which is a better introduction to nightbark
+ * than any paragraph of README.
+ */
+export const vacuousSpecTs = () => `import { test, expect } from './fixtures';
+
+/**
+ * ⚠️ THIS TEST IS DELIBERATELY BROKEN. It passes and proves nothing.
+ *
+ * Run \`npm run audit\` and nightbark will flag it. Then fix it and watch the finding disappear —
+ * that round trip is the point of shipping it.
+ *
+ * Three faults, all of which pass today:
+ *   1. The locator is a selector nothing in the app uses, so it matches nothing — and
+ *      \`toBeHidden()\` is TRUE of an element that does not exist.
+ *   2. Nothing establishes that it ever existed, so there is no premise.
+ *   3. The fixed wait pretends to synchronise and instead just spends 500ms. A wait before a
+ *      negative assertion is the worst case: it passes whenever the wait is shorter than the thing
+ *      it was waiting for.
+ *
+ * Delete it once you have seen the finding. Leaving it is how a suite learns to tolerate noise.
+ */
+test('DELETE ME — the error banner is not shown', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(500);
+    await expect(page.locator('.nb-banner-that-does-not-exist')).toBeHidden();
+});
+`;
+
+export const readmeMd = (name, baseURL) => `# ${name}
+
+Scaffolded by [nightbark](https://github.com/badj/nightbark). Small on purpose — everything here is
+load-bearing, so read it before deleting any of it.
+
+\`\`\`bash
+npm install
+npx playwright install chromium
+BASE_URL=${baseURL} npm test
+npm run audit          # nightbark, read-only
+\`\`\`
+
+⚠️ **One test is deliberately broken.** \`tests/vacuous.spec.ts\` passes and proves nothing; the audit
+flags it. Fix it, watch the finding go, then delete the file. That round trip explains the tool
+better than this README can.
+
+## Why each piece exists
+
+These are the decisions that are **expensive to retrofit** — a suite gets them wrong in week one and
+pays in month six. Everything else was left out on purpose.
+
+| | Why |
+| --- | --- |
+| \`tests/fixtures/pool.ts\` | Per-worker identities, assigned by \`workerIndex\` — deterministic, no locks, no waiting. Retrofitting an allocator means touching every spec that hard-codes an address |
+| \`release()\` in the same file | ⚠️ **A stub you must wire up.** An allocator without teardown just moves the problem to the second run of the day, where the failure looks like a product bug |
+| \`tests/fixtures/index.ts\` | The **only** route to an identity. If a spec can write a literal instead, one eventually will — and that is the first shared-state defect |
+| \`workers: POOL.length\` | More workers than identities means two sharing one. The pool throws as a backstop, because wrapping would hand out a duplicate and the run would pass while proving nothing |
+| \`retries: 0\` | A retry turns a real intermittent defect into a green run and a note nobody reads |
+| \`fullyParallel: true\` | Serialising is how a race gets worked around rather than fixed. The flake goes, the cause stays, every future run pays the serial cost |
+| \`forbidOnly\` in CI | A committed \`test.only\` silently reduces the suite to one test, and the run is green |
+| CI for both platforms | Generated from one definition. The audit runs from commit one, so vacuous assertions are caught while they are cheap |
+
+## The one rule worth keeping
+
+**A test never names an identity — it asks for one.** Everything in \`pool.ts\` follows from that, and
+the day somebody writes an address literal is the day the suite starts sharing state.
+
+Playwright's own docs cover everything else: <https://playwright.dev>
+`;
+
+export { POOL_SIZE };

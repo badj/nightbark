@@ -75,6 +75,7 @@ named after.
 ## Usage
 
 ```bash
+nightbark init <dir>                   # scaffold a suite whose disciplines are structural
 nightbark audit <path>                 # run the gates over a repo (read-only)
 nightbark audit <path> --gate <id>     # one gate
 nightbark audit <path> --sarif out.json  # SARIF 2.1.0 for CI annotation
@@ -91,6 +92,29 @@ no destination-specific code. See [INTEGRATIONS](docs/INTEGRATIONS.md).
 
 ⚠️ `--fail-on` defaults to **`error`**, not `warning`. A tool whose first run reds somebody's
 pipeline gets removed from the pipeline; tighten it once the output has earned trust.
+
+## `init` — what it scaffolds, and what it refuses
+
+`npm init playwright@latest` already gives you a project, maintained by the people who write
+Playwright. Competing with that would be daft. What is missing is the **structural decisions that
+are expensive to retrofit** — the ones a suite gets wrong in week one and pays for in month six.
+
+So the scaffold is small and every file is load-bearing:
+
+| | Why |
+| --- | --- |
+| `tests/fixtures/pool.ts` | Per-worker identities by `workerIndex` — deterministic, no locks, no waiting. Retrofitting an allocator means touching every spec that hard-codes an address |
+| `release()` | A stub that **announces itself**. An allocator without teardown moves the problem to the second run of the day, where the failure looks like a product bug |
+| `tests/fixtures/index.ts` | The **only** route to an identity. If a spec can write a literal, one eventually will |
+| `workers: POOL.length` | A hard ceiling. The pool **throws** rather than modulo-wrapping, because wrapping hands two workers one identity and the run passes while proving nothing |
+| `tests/vacuous.spec.ts` | **Deliberately broken.** It passes and proves nothing; the audit flags it. A scaffold that ships entirely green teaches nothing about what the tool is for |
+
+Three refusals, per [ADR-0006](docs/adr/0006-what-init-scaffolds.md): **no configuration surface**
+(flags are where a generator's complexity hides), **no speculative furniture** (it teaches people to
+delete generated code unread, and one day that is the allocator), and **no Playwright tutorial**.
+
+Verified on the output, not assumed: `tsc --noEmit` clean, 2 specs collect, both CI files parse,
+and the audit flags **only** the vacuous spec.
 
 ## CI — one definition, two platforms
 
@@ -142,7 +166,7 @@ beats four that are not, and saying so is cheaper than discovering it later.
 | --- | --- | --- |
 | 0 | Repo, licence, ADRs, definition of done | ✅ done |
 | 1 | `audit` + the vacuity Irregular + Moriarty, read-only, against **any** Playwright repo | ✅ done |
-| 2 | `nightbark init` — scaffold carrying the disciplines as gates | |
+| 2 | `nightbark init` — scaffold carrying the disciplines as structure | ✅ done |
 | 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | ✅ done |
 | 4 | `TestCaseSink` interface + ADO Test Plans adapter (Jira / Confluence contract-tested) | |
 | 5 | Installable package | |
