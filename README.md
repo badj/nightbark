@@ -93,6 +93,25 @@ no destination-specific code. See [INTEGRATIONS](docs/INTEGRATIONS.md).
 ⚠️ `--fail-on` defaults to **`error`**, not `warning`. A tool whose first run reds somebody's
 pipeline gets removed from the pipeline; tighten it once the output has earned trust.
 
+## Installing
+
+```bash
+npm i -D nightbark        # once published
+npm i -D /path/to/clone   # or straight from a checkout
+npx nightbark             # either way
+```
+
+Verified by **building a tarball and installing it into a clean directory**, not by reading
+`package.json`: all five subcommands run from inside `node_modules`, including `selftest`.
+
+⚠️ `fixtures/` ships deliberately. `nightbark selftest` reads them, so without them an installed
+package cannot prove its own gates fire — and that proof is the central claim. The first draft
+excluded them to save 20kB, which would have shipped a CLI whose most important subcommand crashed
+on a missing path. A consumer being able to run `npx nightbark selftest` and watch each gate fire on
+a known-broken fixture is worth far more than the bytes.
+
+`prepublishOnly` runs the full selftest, so a broken build cannot be published.
+
 ## `init` — what it scaffolds, and what it refuses
 
 `npm init playwright@latest` already gives you a project, maintained by the people who write
@@ -169,7 +188,7 @@ beats four that are not, and saying so is cheaper than discovering it later.
 | 2 | `nightbark init` — scaffold carrying the disciplines as structure | ✅ done |
 | 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | ✅ done |
 | 4 | `TestCaseSink` interface + ADO Test Plans adapter (Jira / Confluence contract-tested) | |
-| 5 | Installable package | |
+| 5 | Installable package | ✅ done |
 
 Phase 1 deliberately comes before the scaffold: it works against suites that **already exist**, so it
 is useful on day one of a contract with no migration, and the judgement is the part worth carrying.

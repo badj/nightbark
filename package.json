@@ -1,7 +1,6 @@
 {
     "name": "nightbark",
-    "version": "0.0.0",
-    "private": true,
+    "version": "0.1.0",
     "description": "Finds the tests that did not bark - assertions that cannot fail, fixtures that collide, and detectors that were never able to fire.",
     "license": "MIT",
     "author": "JJ (Jacob) Badenhorst",
@@ -13,9 +12,36 @@
         "selftest": "node bin/nightbark.mjs selftest && node bin/nightbark.mjs selfcheck && node scripts/gen-ci.mjs --check && node --test \"test/*.test.mjs\"",
         "audit": "node bin/nightbark.mjs audit",
         "ci:gen": "node scripts/gen-ci.mjs",
-        "ci:check": "node scripts/gen-ci.mjs --check"
+        "ci:check": "node scripts/gen-ci.mjs --check",
+        "prepublishOnly": "npm run selftest"
     },
     "bin": {
         "nightbark": "./bin/nightbark.mjs"
-    }
+    },
+    "keywords": [
+        "playwright",
+        "testing",
+        "static-analysis",
+        "sarif",
+        "test-quality",
+        "flaky-tests",
+        "e2e"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/badj/nightbark.git"
+    },
+    "homepage": "https://github.com/badj/nightbark#readme",
+    "bugs": {
+        "url": "https://github.com/badj/nightbark/issues"
+    },
+    "files": [
+        "bin/",
+        "src/",
+        "ci/",
+        "fixtures/",
+        "docs/",
+        "README.md",
+        "LICENSE"
+    ]
 }
