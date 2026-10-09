@@ -10,8 +10,10 @@
         "node": ">=20"
     },
     "scripts": {
-        "selftest": "node bin/nightbark.mjs selftest && node bin/nightbark.mjs selfcheck && node --test \"test/*.test.mjs\"",
-        "audit": "node bin/nightbark.mjs audit"
+        "selftest": "node bin/nightbark.mjs selftest && node bin/nightbark.mjs selfcheck && node scripts/gen-ci.mjs --check && node --test \"test/*.test.mjs\"",
+        "audit": "node bin/nightbark.mjs audit",
+        "ci:gen": "node scripts/gen-ci.mjs",
+        "ci:check": "node scripts/gen-ci.mjs --check"
     },
     "bin": {
         "nightbark": "./bin/nightbark.mjs"

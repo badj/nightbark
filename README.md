@@ -92,6 +92,28 @@ no destination-specific code. See [INTEGRATIONS](docs/INTEGRATIONS.md).
 ⚠️ `--fail-on` defaults to **`error`**, not `warning`. A tool whose first run reds somebody's
 pipeline gets removed from the pipeline; tighten it once the output has earned trust.
 
+## CI — one definition, two platforms
+
+[`ci/pipeline.mjs`](ci/pipeline.mjs) is the single source; `npm run ci:gen` emits
+`.github/workflows/nightbark.yml` and `azure-pipelines.yml`. **A generator, not a lowest common
+denominator** — each platform gets its own idioms (SARIF upload to Code Scanning on one side, task
+groups on the other) from shared *intent*.
+
+⚠️ **`npm run ci:check` is the load-bearing half**, and it runs in the selftest. A generated file
+that is committed will be hand-edited eventually, and from that moment the "single source of truth"
+is a lie nobody can see. The check regenerates, diffs, and fails the build — proven both ways: a
+planted hand edit exits 1, and a regeneration clears it.
+
+nightbark's own CI runs its own rules, in this order:
+
+1. `selftest` — **first, deliberately.** A gate that cannot fail reports compliance it never
+   verified, so gates are proven before anything is audited with them.
+2. `selfcheck` — ADR-0001, no client-identifying content
+3. `ci:check` — the generated files still match their definition
+4. the unit tests
+5. an audit of `fixtures/` — which contain deliberate defects, so a run finding **nothing** there
+   means the tool is broken rather than the repo being clean
+
 ## Decisions
 
 The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing direction:
@@ -121,7 +143,7 @@ beats four that are not, and saying so is cheaper than discovering it later.
 | 0 | Repo, licence, ADRs, definition of done | ✅ done |
 | 1 | `audit` + the vacuity Irregular + Moriarty, read-only, against **any** Playwright repo | ✅ done |
 | 2 | `nightbark init` — scaffold carrying the disciplines as gates | |
-| 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | |
+| 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | ✅ done |
 | 4 | `TestCaseSink` interface + ADO Test Plans adapter (Jira / Confluence contract-tested) | |
 | 5 | Installable package | |
 
