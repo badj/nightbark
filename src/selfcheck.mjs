@@ -66,6 +66,23 @@ const SHAPES = [
 /** Files whose job is to discuss these rules, so a mention is the content rather than a leak. */
 const ALLOW_PATHS = [/^docs\/adr\//, /^src\/selfcheck\.mjs$/, /^fixtures\/selfcheck\//];
 
+/**
+ * Paths where the SHAPE rules are suspended — but the denylist is NOT.
+ *
+ * ⚠️ A real tension, resolved rather than fudged. `fixtures/` exists to hold synthetic test data, and
+ * a synthetic case id like `@[700101]` is indistinguishable BY SHAPE from a real one. Left on, the
+ * shape rules flag every traceability fixture, which pushes somebody to weaken the whole check.
+ *
+ * So shape rules skip fixtures — and the DENYLIST still applies there, which is the half that
+ * actually matters. A shape rule guesses; a named term is certain. A real client identifier leaking
+ * into a fixture is still caught, and the synthetic data it is surrounded by is not.
+ *
+ * ⚠️ This was added after the check caught me doing exactly that: I populated traceability fixtures
+ * with real client case ids copied straight out of the live suite, and it fired on all of them
+ * before they shipped. The ids were replaced; this exemption covers the SYNTHETIC replacements only.
+ */
+const SHAPE_EXEMPT = [/^fixtures\//];
+
 export function selfcheck({ root = ROOT } = {}) {
     const denylist = loadDenylist(root);
     const findings = [];
@@ -76,8 +93,9 @@ export function selfcheck({ root = ROOT } = {}) {
         try { text = readFileSync(file.abs, 'utf8'); } catch { continue; }
         const lines = text.split('\n');
 
+        const shapeExempt = SHAPE_EXEMPT.some((re) => re.test(file.path));
         lines.forEach((line, i) => {
-            for (const { id, re, why } of SHAPES) {
+            if (!shapeExempt) for (const { id, re, why } of SHAPES) {
                 re.lastIndex = 0;
                 const m = re.exec(line);
                 if (m) findings.push({ rule: id, file: file.path, line: i + 1, hit: m[0], why });

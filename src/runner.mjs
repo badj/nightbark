@@ -50,6 +50,11 @@ const TEST_ROOT = /(^|\/)(tests?|e2e|__tests__|cypress|playwright|specs?|feature
 const FRAMEWORK_IMPORT = /from\s+['"](?:@playwright\/test|playwright(?:-core)?|@jest\/globals|vitest|cypress|@cucumber\/cucumber|playwright-bdd)['"]/;
 
 export function looksLikeTestCode(path, text) {
+    // ⚠️ A .feature file IS a test, whatever directory it sits in — there is no other reason for
+    // Gherkin to exist. The first version required a `features/` or `tests/` ancestor, so a
+    // .feature anywhere else was invisible to every test-code-scoped gate. Found when a fixture
+    // planting three faults reported only the one that happened to be a .spec.ts.
+    if (/\.feature$/.test(path)) return true;
     return SPEC_NAME.test(path) || TEST_ROOT.test(path) || FRAMEWORK_IMPORT.test(text);
 }
 
@@ -139,7 +144,11 @@ export function audit(root, { only = null } = {}) {
         }
         for (const f of raw) {
             findings.push({
-                origin: 'gate', gateId: gate.id, severity: gate.severity,
+                origin: 'gate', gateId: gate.id,
+                // A finding may lower its own severity: the same gate can produce an unambiguous
+                // defect and a judgement call, and flattening both to one level makes the reader
+                // distrust whichever one they disagree with.
+                severity: f.severity ?? gate.severity,
                 file: f.file, line: f.line, message: f.message, excerpt: f.excerpt, why: gate.why,
             });
         }

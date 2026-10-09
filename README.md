@@ -267,7 +267,24 @@ Per gate:
 | --- | --- | --- | --- | --- |
 | `fixed-wait` | 31 | 31 | **100%** | the workhorse — fixed sleeps appear even in careful code |
 | `serialised-suite` | 8 | 8 | **100%** | ⚠️ 4 cite a reason the suite's own notes record as superseded |
+| `traceability` | 13 | 13 | **100%** | all `note` — that suite is clean on the unambiguous check |
 | `shared-test-identity` | 3 | 1 | **33%** | reports as a `note` for exactly this reason |
+
+### ⚠️ One target is SYNTHETIC, and is kept in its own row
+
+| Target | Findings | Expected | Match |
+| --- | --- | --- | --- |
+| `fixtures/targets/traced-suite` **(synthetic)** | 5 (2 error, 3 note) | 5 (2 error, 3 note) | **exact** |
+
+No public Playwright repo carries requirement ids — measured as **zero** across all three real
+targets — so `traceability` has no field data of its own. A purpose-built target with an explicit
+[answer key](fixtures/targets/traced-suite/ANSWERS.md) fills that gap, and **its number is never
+added to the real-repo figures**: a synthetic result measures the gate against my own expectations,
+where only a real repo measures it against the world.
+
+Its value is the five **correct** patterns it also contains, three of which broke earlier versions of
+the gate: an inherited `Feature:`-line tag read as a clash, a defect reference on a parked test read
+as a lying id, and a collection-neutral decision marker read as an exclusion.
 
 ### The Irregular, measured separately
 
@@ -306,7 +323,16 @@ inheritance, interface aggregates, getters, locator-returning methods and one-ho
 | First contact with a real repo | 6 | a **React component** whose sleep was deliberate; a textbook **bounded poll** — the pattern the gate's own advice recommends; a **not-found probe** read as a shared account |
 | The production suite | 4 | **wiki page ids** read as phone numbers (9 false positives of 20); boundary and wrong-locale **probes**; a number inside a **diagnostic string**; `waitForTimeout` as a **poll interval** — *the same bug already fixed on the other branch and not swept for* |
 
-⚠️ **And one leak of my own.** Documenting the page-id defect, I pasted a real client page id into
+⚠️ **The ADR-0001 self-check caught me a second time, automatically.** Building the traceability
+fixtures I populated them with **real client case ids**, copied straight out of the live suite without
+thinking. The `selfcheck` added two days earlier fired on all 23 of them before they could ship.
+
+It also surfaced a real design question rather than just a leak: a *synthetic* case id is
+indistinguishable **by shape** from a real one, so the shape rules flagged every legitimate fixture
+too. Resolved by suspending the **shape** rules under `fixtures/` while keeping the **denylist**
+active there — a shape rule guesses, a named term is certain — and proven both ways.
+
+⚠️ **And one earlier leak of my own.** Documenting the page-id defect, I pasted a real client page id into
 this README — and then into a gate comment. The `selfcheck` I wrote to enforce
 [ADR-0001](docs/adr/0001-no-client-code.md) **missed it**, because it matched `@ado_123456` notation
 and not a bare digit run in a URL path. Fixed the leak, added the shape rule, and the new rule

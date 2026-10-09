@@ -32,11 +32,20 @@ export function selftest() {
                     results.push({ gate: gate.id, kind, ok: false, detail: `audit of fixtures/${rel} threw: ${err.message}` });
                     continue;
                 }
-                const ok = kind === 'fires' ? found.length > 0 : found.length === 0;
+                // ⚠️ `>0` IS TOO WEAK AN ASSERTION, and that is not a hypothetical. A fires fixture
+                // planting THREE faults reported only one, and the proof passed anyway — so a gate
+                // catching a third of what it should looked healthy. Where a gate declares
+                // `fixtures.expect`, the count must match exactly.
+                const want = gate.fixtures.expect;
+                const ok = kind === 'fires'
+                    ? (want === undefined ? found.length > 0 : found.length === want)
+                    : found.length === 0;
                 results.push({
                     gate: gate.id, kind, ok,
                     detail: kind === 'fires'
-                        ? (ok ? `${found.length} finding(s)` : 'NO findings — this gate cannot fire')
+                        ? (ok ? `${found.length} finding(s)${want !== undefined ? ' (exactly as declared)' : ''}`
+                              : want === undefined ? 'NO findings — this gate cannot fire'
+                              : `${found.length} finding(s) but the fixture declares ${want} — ${found.length < want ? 'faults are being MISSED' : 'something extra is firing'}`)
                         : (ok ? 'silent, as required' : `${found.length} FALSE POSITIVE(s): ` + found.map((f) => `${f.file}:${f.line} ${f.message}`).join(' | ')),
                 });
                 continue;

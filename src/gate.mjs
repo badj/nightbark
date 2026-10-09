@@ -71,6 +71,9 @@ export function validateGate(gate) {
     if (gate?.fixtures && (!gate.fixtures.fires || !gate.fixtures.silent)) {
         problems.push('"fixtures" needs BOTH fires and silent — a gate with no near-miss fixture is a gate nobody has proven is specific');
     }
+    if (gate?.fixtures?.expect !== undefined && !Number.isInteger(gate.fixtures.expect)) {
+        problems.push('"fixtures.expect" must be an integer — the number of findings the fires fixture should produce');
+    }
     if (problems.length) throw new Error(`invalid gate ${gate?.id ?? '(no id)'}: ${problems.join('; ')}`);
     return gate;
 }
