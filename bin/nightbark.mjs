@@ -10,6 +10,7 @@ import { mergeVerdicts } from '../src/irregulars/verdict.mjs';
 import { init } from '../src/init/index.mjs';
 import { adoSink } from '../src/sinks/ado.mjs';
 import { describePublish, publishFailed } from '../src/sinks/sink.mjs';
+import { diagnose, describeDiagnosis } from '../src/sinks/diagnose.mjs';
 import { readFileSync } from 'node:fs';
 import { selftest } from '../src/selftest.mjs';
 import { selfcheck } from '../src/selfcheck.mjs';
@@ -47,19 +48,40 @@ if (cmd === 'sink:ado') {
     const armed = rest.includes('--arm');
     const outcome = flag('outcome') ?? 'passed';
 
-    if (!org || !project || !plan || !cases.length) {
+    const diagnosing = rest.includes('--diagnose');
+
+    if (!org || !project || (!diagnosing && (!plan || !cases.length))) {
         console.log(`
   usage: nightbark sink:ado --org <o> --project <p> --plan <id> --case <id[,id]> [--suites a,b]
                             [--outcome passed|failed|blocked] [--arm]
+         nightbark sink:ado --org <o> --project <p> [--plan <id>] [--suites a,b] [--case id] --diagnose
 
   Read-only without --arm: it resolves each case to its test point(s) and tells you whether the
   scope actually matches anything. AZURE_TOKEN must be set (needs Test Management read & write).
+
+  --diagnose walks the chain ONE HOP AT A TIME - credential, organisation, project, plan, suites,
+  the suite FENCE, then the points - and names the rung that broke plus what fixes it. Reach for it
+  when the plain form fails, because the same status code means different things at different
+  depths: a 404 on the organisation is a typo, a 404 on the plan is usually permissions wearing a
+  404. Start it with just --org and --project; add --plan, --suites and --case to climb higher.
 
   \u26a0\ufe0f  Run this BEFORE trusting any scoped publish. A stale scope writes nothing and reports
       success, so "it ran green" is not evidence that anything was recorded.
 `);
         process.exit(1);
     }
+
+    if (diagnosing) {
+        // No try/catch: the ladder is built never to throw on a bad response - it needs the status
+        // number, not an exception. A throw here would be a bug in the ladder and should surface.
+        const result = await diagnose({
+            org, project, pat, planId: plan, suiteIds: suites, caseIds: cases,
+        });
+        console.log(`\n  ado-test-plans - diagnosing ${org}/${project}${plan ? ` plan ${plan}` : ''}\n`);
+        console.log('  ' + describeDiagnosis(result).split('\n').join('\n  ') + '\n');
+        process.exit(result.ok ? 0 : 1);
+    }
+
     try {
         const sink = adoSink({ org, project, pat });
         const report = await sink.publish(
@@ -284,6 +306,7 @@ console.log(`
     nightbark challenge <p> <a>   Moriarty: attack the findings a judge returned
     nightbark verdict <p> ...     merge judge + Moriarty into findings (--sarif, --fail-on)
     nightbark sink:ado ...        check an ADO Test Plan scope resolves (read-only unless --arm)
+    nightbark sink:ado --diagnose walk the ADO chain one hop at a time; name the rung that broke
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);

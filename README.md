@@ -121,25 +121,75 @@ Five behaviours the interface mandates of any adapter, because each one has bitt
 | **Paginate** | Page one always looks complete |
 | **Never invent an id** | Publishing to a guessed point is worse than publishing nothing, because somebody will believe it |
 
-### ⚠️ Contract-tested, NOT live-verified
+### ⚠️ Contract-tested, NOT live-verified — and the part that word hides
 
-17 tests run the adapter against a stub implementing the documented REST shapes. That proves URL
-construction, the PAT encoding (Basic auth with an *empty* username — the colon is required), the
-pagination loop, error discrimination, idempotent linking, and that a zero-match publish fails
-loudly.
+46 tests run the adapter and its diagnostic against the documented REST shapes. It has **not** been
+run against a live Azure DevOps instance, and [docs/CONTRACTS.md](docs/CONTRACTS.md) records exactly
+what that does and does not leave unproven, layer by layer.
 
-It has **not** been run against a live Azure DevOps instance. What a stub cannot prove: that a
-particular plan has particular suites, that permissions are right, or your org's API quirks.
+The short version is more interesting than "we could not test it". A live run would prove **one**
+path: the happy one, on one plan, with one person's permissions. Every failure that actually costs
+somebody an afternoon is on the other paths — and those cannot be provoked on a live instance *even
+with full access to one*:
 
-One command settles it, for whoever has access:
+| The failure | What provoking it live would require |
+| --- | --- |
+| a PAT with Code scope but not Test Management | issuing a deliberately broken token |
+| a plan id that exists but is invisible to you | borrowing someone else's permissions |
+| ⛔ a suite fence left behind by a plan reorganisation | reorganising a real plan |
+| an anonymous call answered **203 + HTML**, not 401 | revoking a token mid-request |
+| DNS / proxy / TLS interception | breaking your own network |
+
+A stub produces all five on demand, and each one has a test. What genuinely remains unverified is
+narrow and named: **the write path against a real plan.** That stays written down rather than quietly
+implied — and the writes are behind `--arm`, which nothing defaults to.
+
+⚠️ One of those tests exists because the others were not enough: every stub above resembles whatever
+I assumed `fetch` does. Five more run the ladder through the **real global `fetch`** against a
+loopback HTTP server, with no stub at all — because 24 tests passing against a fiction is precisely
+the shape of failure this project exists to name.
+
+### `--diagnose` — walk the chain one hop at a time
 
 ```bash
-AZURE_TOKEN=<pat> nightbark sink:ado --org <o> --project <p> --plan <id> --case <id>
+AZURE_TOKEN=<pat> nightbark sink:ado --org <o> --project <p> --plan <id> --suites a,b --diagnose
 ```
 
-Read-only, so there is nothing to undo if it is wrong.
+Read-only, so there is nothing to undo if it is wrong. Seven rungs — credential, organisation,
+project, plan, suites, **the fence**, points — each reporting what it proved, and on a failure what
+fixes it. Everything below a failure reports as `skipped`, because *unanswered* and *passing* are not
+the same thing.
 
-⚠️ One behaviour is worth knowing even before that: an **empty** token is refused up front rather
+It exists because **the same status code means different things at different depths**, and one error
+message cannot say both: a 404 on the organisation is a typo, while a 404 on the plan is usually
+*permissions wearing a 404* — ADO answers 404 for a plan you cannot see. The 403 is the sharpest
+example: it arrives only at rung 4, on a token that resolved the org and the project and would clone
+repositories all day. "403 Forbidden" alone sends you hunting the wrong thing.
+
+⛔ **Rung 6 is the one worth the whole command, because it is the only failure here that is silent in
+normal use.** A plan gets reorganised into drops; a publish still scoped to the old suite ids matches
+no points, writes nothing, and reports every case as a tick. Nothing in the output is *wrong* — there
+is simply nothing where the writes should have been, and it can sit undetected for weeks. So rung 6
+does not merely check that the ids resolve; when one does not, it lists the suites that **do** exist,
+because the next question is always *"then what should it be?"*:
+
+```
+✖ 6. ⛔ the scoped suite ids still exist in the plan
+     2 of 2 scoped suite id(s) are NOT in plan 764570: 865414, 865843.
+     ⤷ fix: ⛔ This is the failure that reports success. A publish scoped to a suite that no
+       longer exists matches no points, writes nothing, and ticks every case — the run
+       output is not wrong, there is simply nothing where the writes should be.
+       The suites that DO exist: 900001 (Drop1) · 900002 (Drop2)
+       Resolve the ids at RUN TIME rather than pinning them.
+```
+
+⚠️ Rung 1 reports the credential's **length and character class only, never any part of its value** —
+including when it is malformed. It recognises the five paste errors (shell quotes kept, the whole
+`Basic …` header pasted, the variable *name* pasted, a copied newline, a leading colon) from shape
+alone. A diagnostic that echoes a credential into terminal scrollback has turned a support question
+into a rotation.
+
+⚠️ And one behaviour worth knowing before any of this: an **empty** token is refused up front rather
 than sent. Azure answers an unauthenticated call with **203 and an HTML sign-in page**, not a 401 —
 parsed naively that becomes an empty result set, and the caller reports a clean run against a plan it
 never reached.
@@ -219,6 +269,7 @@ The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing d
 | [ADR-0003](docs/adr/0003-targets-and-app-under-test.md) | What we audit, and the app we scaffold against |
 | [ADR-0004](docs/adr/0004-where-the-smarts-live.md) | Gates first; agents only where judgement is required |
 | [INTEGRATIONS](docs/INTEGRATIONS.md) | Emit SARIF / JUnit / exit codes — don't build connectors |
+| [CONTRACTS](docs/CONTRACTS.md) | ⚠️ What each layer is verified against — and the one gap that is still open |
 
 ## Status
 
@@ -243,10 +294,6 @@ beats four that are not, and saying so is cheaper than discovering it later.
 
 Phase 1 deliberately comes before the scaffold: it works against suites that **already exist**, so it
 is useful on day one of a contract with no migration, and the judgement is the part worth carrying.
-
-## Licence
-
-MIT © JJ (Jacob) Badenhorst
 
 ## Precision
 
@@ -351,114 +398,6 @@ as a constant beside a pool it was not part of**. An allocator existed and this 
 the suite's own notes record it causing a real concurrent-run failure. *Shared **and** outside the
 allocator that exists* is a far sharper signal than *shared*.
 
-## Decisions
-
-The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing direction:
-
-| | |
-| --- | --- |
-| [ADR-0001](docs/adr/0001-no-client-code.md) | No client code, ever. Patterns re-expressed from scratch |
-| [ADR-0002](docs/adr/0002-gates-not-prose.md) | A discipline ships as a gate or an auditor, never as prose |
-| [ADR-0003](docs/adr/0003-targets-and-app-under-test.md) | What we audit, and the app we scaffold against |
-| [ADR-0004](docs/adr/0004-where-the-smarts-live.md) | Gates first; agents only where judgement is required |
-| [INTEGRATIONS](docs/INTEGRATIONS.md) | Emit SARIF / JUnit / exit codes — don't build connectors |
-
-## Status
-
-Pre-alpha. Phase 0 (decisions) complete. See [docs/TIER-1.md](docs/TIER-1.md) for what "done" means
-for the first shippable slice.
-
-| Phase | Ships | State |
-| --- | --- | --- |
-| 0 | Repo, licence, ADRs, definition of done | ✅ done |
-| 1 | `nightbark audit` — the Irregulars, read-only, against **any** Playwright repo | next |
-| 2 | `nightbark init` — scaffold carrying the disciplines as gates | |
-| 3 | One pipeline definition → GitHub Actions **and** Azure Pipelines | |
-| 4 | `TestCaseSink` interface + ADO Test Plans adapter (Jira / Confluence contract-tested) | |
-| 5 | Installable package | |
-
-Phase 1 deliberately comes before the scaffold: it works against suites that **already exist**, so it
-is useful on day one of a contract with no migration, and the judgement is the part worth carrying.
-
 ## Licence
 
 MIT © JJ (Jacob) Badenhorst
-
-## Precision
-
-The headline metric, per [TIER-1](docs/TIER-1.md) — not finding count. Every finding hand-triaged on
-targets the gates were not written against.
-
-| Target | Files read | Findings | True | Precision |
-| --- | --- | --- | --- | --- |
-| `testmart-parallel-demo` (Playwright) | 77 | 15 | 15 | 100% |
-| `playwright-hybrid-integration-API-UI-A11y` (Playwright) | 29 | 0 | — | n/a |
-| `cypress-realworld-app` (Cypress) | 170 | 2 | 2 | 100% |
-| **a 217-file production suite** (Playwright + BDD) | 217 | 26 | 22 | **85%** |
-
-### The Irregular, measured
-
-| | Findings | True | Precision |
-| --- | --- | --- | --- |
-| Judge alone | 3 | 1 | **33%** |
-| Judge + Moriarty | 1 | 1 | **100%** |
-
-Moriarty **dropped one** claim and **downgraded another**. Without the adversarial pass this
-Irregular would have shipped two wrong findings on its first run — and a reader sent to rewrite two
-correct tests does not open the report a third time.
-
-The one confirmed finding is a class **no gate could reach**:
-
-```ts
-if (page.url() === "/") {            // page.url() is ABSOLUTE — never "/"
-  expect(hasScriptTag).toBeFalsy();  // unreachable
-}
-```
-
-No `else` branch, so a test named *"should handle special characters in registration"* asserts
-nothing on any path. Moriarty refuted its own best escape hatch from inside the same file — a sibling
-test writes `new URL("/", page.url())`, which is only meaningful if the URL is absolute — and then
-**upgraded the headline** from "absent premise" to "unreachable guard, test asserts nothing", because
-that is independently verifiable and the fix is one line.
-
-Locator resolution closed the gap Moriarty named: **8/8** locators resolved on the demo target and
-**8/9** on a 217-file production BDD suite (up from 0/9), tracing through nested components,
-inheritance, interface aggregates, getters, locator-returning methods and one-hop locals.
-
-### The production suite is where it earned its keep
-
-The three public targets are unusually *good* code — a deliberate demo, a careful personal suite, and
-a reference app. A mature suite under real delivery pressure found problems in the gates that none of
-them could:
-
-| Round | What the gate got wrong | Fix |
-| --- | --- | --- |
-| 7 | **Confluence page ids** read as phone numbers (`.../wiki/spaces/XX/pages/<10-digit id>/...`) across 19 files, plus an ADO plan pair and a doc filename — **9 false positives of 20** | strip URLs and paths before matching; require a phone literal to start `+`/`0` or carry separators |
-| 8 | **Boundary and wrong-locale probes** (`maxValid`, "too long", "non-NZ") reported as shared accounts | 4 more noise rules |
-| 9 | A pooled number quoted inside a **diagnostic message string** read as a usage | exclude matches inside long prose |
-| 10 | ⚠️ `waitForTimeout` used as a **poll interval** inside a `while` loop — *the same bug already fixed on the `setTimeout` branch*, left unfixed on this one | apply the poll guard to both branches; both shapes now fixtures |
-
-Round 10 is the instructive one: a defect fixed in one place and not swept for its siblings. That is a
-recurring failure in its own right, and the only reason it surfaced is that a real suite polls in both
-styles where the toy repos poll in neither.
-
-### Gate verdicts after that pass
-
-| Gate | Production precision | Status |
-| --- | --- | --- |
-| `fixed-wait` | **15/15** | solid |
-| `serialised-suite` | **7/7** | solid — and four findings cite a reason the suite's own notes record as superseded, which is precisely the question the gate asks |
-| `shared-test-identity` | ~1–2 of 4 | **demoted to `note`** and reframed as a question |
-
-### ⚠️ `shared-test-identity` is demoted, on evidence
-
-12% precision on first contact, ~25% after six rounds of noise rules. Below the bar this project set
-itself, so it now reports as a `note` that asks a question rather than an `error` that declares a
-defect. Three populations are indistinguishable on the line — a **managed** pool handed out per worker
-behind a lock (correct), a **probe** value reused deliberately (coverage), and a **raw** hard-coded
-account (the defect) — and only the surrounding mechanism separates them.
-
-That is the second shape evidence has pushed from gate to agent, after vacuity. The one genuine
-finding is the design brief for that Irregular: a spare value **defined as a constant beside a pool it
-was not part of** — an allocator existed and this value sat outside it. *Shared **and** outside the
-allocator that exists* is a far sharper signal than *shared*.
