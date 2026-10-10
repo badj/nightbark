@@ -29,6 +29,46 @@ as read-only, because two checkouts of one repo is how work gets silently overwr
 
 ---
 
+## Releasing to npm (`@obvioapac/nightbark`)
+
+**npm only changes on `npm publish`.** Pushing to GitHub does not touch it — including the README,
+which npm shows *as published*. Release when installers would get something: a fix, a gate, docs.
+
+**Choosing the bump (0.x, so everything shifts down one place):**
+
+| Change | Bump |
+| --- | --- |
+| Bug fix, a gate flagging **less** (FP removed), docs/README only | **patch** |
+| New gate/command/flag, **or anything that can turn a user's CI red** | **minor** |
+| Declared stable | **1.0.0**, then breaking = MAJOR |
+
+⚠️ Users run this in CI with `--fail-on`, so **a gate that flags MORE is breaking** even when it is a
+"fix": their pipeline goes red with no change on their side. A new gate, a widened gate, a severity
+raised note→warning, a changed exit code, a renamed command/flag, or a SARIF shape change is
+**minor**, never patch. When asked for a bump, read `git log v<last>..HEAD` and say so if the
+changes imply a bigger one.
+
+**Steps** — the agent does 1–4, the author does 5:
+
+```bash
+npm version patch --no-git-tag-version      # 1. or minor. Edits package.json only
+npm run selftest                            # 2. must be green
+git commit ...                              # 3. long WHY message: what changed since the last tag
+git tag v0.1.1                              #    tag = the exact code that version shipped
+gh auth switch --user badj && git push --follow-tags && gh auth switch --user JJ-Badenhorst-MWNZ
+npm publish                                 # 5. AUTHOR'S terminal — browser 2FA needs a TTY
+npm view @obvioapac/nightbark version       # 6. verify; can take ~3 min to appear
+```
+
+Not plain `npm version patch`: it makes its own one-line commit, and commits here are the design
+record. ⛔ A published version can be unpublished only within 72h, and that number can **never** be
+reused — so selftest before tagging, not after.
+
+**Tags:** `v0.1.0` = `89d2d28`, tagged after the fact; `npm pack` of that commit reproduces the
+registry shasum exactly (`d7c6448c…`, checked 2026-10-10).
+
+---
+
 ## The rule that matters most
 
 ⛔ **Never write a number that was not measured.** Not a precision figure, not a file count, not
