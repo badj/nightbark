@@ -87,8 +87,9 @@ Holmes: "That was the curious incident."
 The dog did not bark, so the intruder was known to it, so it was the trainer.
 The absence of a signal was the evidence.
 
-That is what this tool is for. A test that did not fail may be proving nothing — and a suite that is suspiciously green 
-is a dog that did not bark.`nightbark` goes looking for the ones that should have barked and didn't.
+That is what this tool is for. A test that did not fail may be proving nothing 
+— and a suite that is suspiciously green is a dog that did not bark.
+`nightbark` goes looking for the ones that should have barked and didn't.
 ```
 
 
