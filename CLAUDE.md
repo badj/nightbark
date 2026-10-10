@@ -147,7 +147,12 @@ package that could not run its own selftest; the ADR-0001 self-check caught two 
    named constant beside a pool it was not part of**.
 2. **One armed ADO publish** against a disposable plan — the only genuinely unverified path
    (`docs/CONTRACTS.md` records what every layer is verified against).
-3. **Publish decision** — the npm name `nightbark` is free; the package is publish-ready. The repo
-   is private. ⛔ **Do not publish or make the repo public without asking.**
+3. **Published as `@obvioapac/nightbark`**, not `nightbark`. The unscoped name is unregistered but
+   **unpublishable**: on 2026-10-10 npm's typosquat filter refused it as "too similar to existing
+   package nightmare". Scoped names skip that check; the `bin` stays `nightbark`. 0.1.0 went live
+   2026-10-10 (81 files; `npm i -D @obvioapac/nightbark && npx nightbark selftest` → 8 proofs, 0
+   failing, from the registry). The repo was made public the same day. ⚠️ The npm page shows the
+   README **as published** — README edits reach npm only with a new version. Publishing needs a TTY
+   for npm's browser 2FA approval, so it is run from the author's terminal, not from an agent shell.
 
 A fixture-collision auditor is an idea with a precedent and no measurement. Say so if it comes up.

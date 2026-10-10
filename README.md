@@ -330,9 +330,9 @@ threshold is calibrated against that total.
 ## Installing
 
 ```bash
-npm i -D nightbark        # once published
-npm i -D /path/to/clone   # or straight from a checkout
-npx nightbark             # either way
+npm i -D @obvioapac/nightbark   # from the registry
+npm i -D /path/to/clone          # or straight from a checkout
+npx nightbark                    # either way - the command is unscoped
 ```
 
 Verified by **building a tarball and installing it into a clean directory**, not by reading

@@ -1,5 +1,5 @@
 {
-    "name": "nightbark",
+    "name": "@obvioapac/nightbark",
     "version": "0.1.0",
     "description": "Finds the tests that did not bark - assertions that cannot fail, fixtures that collide, and detectors that were never able to fire.",
     "license": "MIT",
@@ -16,7 +16,7 @@
         "prepublishOnly": "npm run selftest"
     },
     "bin": {
-        "nightbark": "./bin/nightbark.mjs"
+        "nightbark": "bin/nightbark.mjs"
     },
     "keywords": [
         "playwright",
@@ -43,5 +43,8 @@
         "docs/",
         "README.md",
         "LICENSE"
-    ]
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
 }

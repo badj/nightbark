@@ -157,7 +157,7 @@ BASE_URL=${baseURL} npm test
 The audit is a separate tool. Install it however suits you:
 
 \`\`\`bash
-npm i -D nightbark        # if it is published to the registry
+npm i -D @obvioapac/nightbark   # from the registry
 # or, from a checkout:
 npm i -D /path/to/nightbark
 # then
