@@ -202,19 +202,16 @@ test('the stored art is intact — 67 rows, no row wider than it claims', () => 
     assert.ok(LOGO_ART[0].trim().length > 0 && LOGO_ART[LOGO_HEIGHT - 1].trim().length > 0, 'no blank edges');
 });
 
-test('⛔ in the full logo ONLY the name is branded — the art stays the terminal\'s colour', () => {
-    // Colouring both made the block one flat slab of purple, which reads as a wall rather than a
-    // logo: the wordmark has nothing to stand out against.
-    const brand = brandEscape({ env: { COLORTERM: 'truecolor' } });
-    const out = fullLogo({ colour: true, brand }).split('\n').filter((l) => l.trim());
-    const branded = out.filter((l) => l.includes(brand));
-    assert.equal(branded.length, 6, 'exactly the six wordmark rows');
-    for (const l of branded) assert.ok(/[█╗╚═]/.test(l), 'and they are wordmark rows, not art');
-    // Every art row must be untouched.
-    for (const art of LOGO_ART) {
-        if (!art.trim()) continue;
-        assert.ok(out.some((l) => l === art), 'an art row was modified');
-    }
+test('⛔ the three colours never bleed into each other', () => {
+    // Originally this asserted the art stayed PLAIN — true when the name was the only branded thing.
+    // The art now has its own colour, so the property worth pinning changed: each region carries its
+    // OWN escape and no other.
+    const env = { COLORTERM: 'truecolor' };
+    const b = escapeFor(BRAND, { env });
+    const a = escapeFor(ART, { env });
+    const out = fullLogo({ colour: true, brand: b, art: a, tag: escapeFor(TAG, { env }) }).split('\n');
+    for (const l of out.filter((x) => x.includes(b))) assert.ok(!l.includes(a), 'a wordmark row carries the art colour');
+    for (const l of out.filter((x) => x.includes(a))) assert.ok(!l.includes(b), 'an art row carries the name colour');
 });
 
 test('⚠️ truecolour is detected beyond COLORTERM, which is routinely unset', () => {
@@ -226,4 +223,52 @@ test('⚠️ truecolour is detected beyond COLORTERM, which is routinely unset',
     assert.equal(brandEscape({ env: { TERM_PROGRAM: 'vscode' } }), exact);
     // ⛔ Apple Terminal genuinely has no 24-bit support; claiming it does makes the logo worse.
     assert.equal(brandEscape({ env: { TERM_PROGRAM: 'Apple_Terminal', TERM: 'xterm-256color' } }), `\x1b[38;5;${BRAND.xterm256}m`);
+});
+
+// ── the three brand colours ────────────────────────────────────────────────────────────────────
+
+import { ART, TAG, artEscape, tagEscape, escapeFor } from '../src/ui/banner.mjs';
+
+test('three colours, three jobs — art, name, tagline', () => {
+    const env = { COLORTERM: 'truecolor' };
+    const out = fullLogo({
+        colour: true,
+        brand: escapeFor(BRAND, { env }), art: escapeFor(ART, { env }), tag: escapeFor(TAG, { env }),
+    }).split('\n');
+    const count = (spec) => out.filter((l) => l.includes(escapeFor(spec, { env }))).length;
+    assert.equal(count(ART), LOGO_HEIGHT, 'every art row');
+    assert.equal(count(BRAND), 6, 'the six wordmark rows');
+    assert.equal(count(TAG), 1, 'the tagline');
+    // and they are genuinely different escapes
+    assert.equal(new Set([BRAND, ART, TAG].map((s) => escapeFor(s, { env }))).size, 3);
+});
+
+test('⚠️ every 256-colour fallback is COMPUTED against the xterm cube, not eyeballed', () => {
+    // One of these shipped wrong for a few minutes: #F04A0A was written as 166 from memory when the
+    // nearest is actually 202. Eyeballing an approximation is how a brand lands a shade out on every
+    // machine that is not the author's, and nothing in the output says so.
+    const L = [0, 95, 135, 175, 215, 255];
+    const palette = [];
+    for (let r = 0; r < 6; r++) for (let g = 0; g < 6; g++) for (let b = 0; b < 6; b++) palette.push([16 + 36 * r + 6 * g + b, [L[r], L[g], L[b]]]);
+    for (let i = 0; i < 24; i++) { const v = 8 + i * 10; palette.push([232 + i, [v, v, v]]); }
+    const nearest = (t) => palette.reduce((best, [i, c]) => {
+        const d = (c[0] - t[0]) ** 2 + (c[1] - t[1]) ** 2 + (c[2] - t[2]) ** 2;
+        return d < best.d ? { i, d } : best;
+    }, { d: Infinity }).i;
+
+    for (const spec of [BRAND, ART, TAG]) {
+        assert.equal(spec.xterm256, nearest(spec.rgb), `#${spec.hex} should fall back to ${nearest(spec.rgb)}, not ${spec.xterm256}`);
+        assert.equal(spec.rgb.length, 3);
+        assert.match(spec.hex, /^[0-9A-F]{6}$/);
+    }
+});
+
+test('a colour degrades through all three depths', () => {
+    for (const spec of [BRAND, ART, TAG]) {
+        assert.equal(escapeFor(spec, { env: { COLORTERM: 'truecolor' } }), `\x1b[38;2;${spec.rgb.join(';')}m`);
+        assert.equal(escapeFor(spec, { env: { TERM: 'xterm-256color' } }), `\x1b[38;5;${spec.xterm256}m`);
+        assert.equal(escapeFor(spec, { env: {} }), spec.basic);
+    }
+    assert.equal(artEscape({ env: { COLORTERM: 'truecolor' } }), `\x1b[38;2;${ART.rgb.join(';')}m`);
+    assert.equal(tagEscape({ env: { COLORTERM: 'truecolor' } }), `\x1b[38;2;${TAG.rgb.join(';')}m`);
 });
