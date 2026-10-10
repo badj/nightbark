@@ -31,78 +31,20 @@ export const WORDMARK_WIDTH = FULL[0].length;
 
 
 /**
- * The dog, in profile, mid-bark — ear up, jaws open.
+ * ⛔ THERE IS ONLY ONE DOG, and that is the whole point of this note.
  *
- * ⚠️ DRAWN, NOT TRACED. The pose came from a reference the author found (a watermarked stock
- * image): barking dog head, profile, ear up, jaws apart. The POSE is subject matter and nobody owns
- * it; the reference's actual linework is theirs, so none of it is here. At 20x16 pixels there is
- * room for a silhouette and nothing else anyway.
+ * This file used to carry a SECOND dog — a 20x16 silhouette drawn to sit beside the wordmark on a
+ * terminal too narrow for the full logo. It was decent art and it was the wrong idea: a terminal at
+ * 101 columns showed one animal and a terminal at 111 showed a completely different one. A logo
+ * that changes species with the window width is not a logo.
  *
- * Designed as a 20x16 PIXEL grid and rendered two rows at a time with ▀▄█, which is what makes a
- * recognisable dog possible at this size: six terminal rows of whole blocks is far too coarse — the
- * first four attempts all came out as blobs — but half-blocks give 16 vertical pixels in 8 rows.
+ * ⚠️ AND THE BIG ART CANNOT SIMPLY BE SHRUNK. It is a fine-line conversion where the dog is formed
+ * by subtle GAPS in a field of glyphs, so downsampling 67x109 to 8x30 — tried, both polarities —
+ * produces mush rather than a smaller dog. There is no middle size available.
  *
- * The open jaw is the whole point. Earlier passes drew the mouth CLOSED, and a closed-mouth dog is
- * a poor logo for something called nightbark.
+ * So the tiers below degrade to the WORDMARK, never to a different drawing. If the dog does not
+ * fit, there is no dog.
  */
-const DOG_PIXELS = [
-    '..###...............',
-    '..#####.............',
-    '.#######.......#####',
-    '.########....#######',
-    '.#########.#########',
-    '.##########.########',
-    '.###########........',
-    '.###########........',
-    '.############.......',
-    '.############.#####.',
-    '.###########.#######',
-    '..##########.######.',
-    '..##########.####...',
-    '..##########........',
-    '...#########........',
-    '....#######.........',
-];
-
-/** Two pixel rows per terminal row: ▀ top only, ▄ bottom only, █ both. */
-function fromPixels(grid) {
-    const out = [];
-    for (let y = 0; y < grid.length; y += 2) {
-        const top = grid[y] ?? '';
-        const bot = grid[y + 1] ?? '';
-        let line = '';
-        for (let x = 0; x < Math.max(top.length, bot.length); x++) {
-            const a = top[x] === '#';
-            const b = bot[x] === '#';
-            line += a && b ? '█' : a ? '▀' : b ? '▄' : ' ';
-        }
-        out.push(line);
-    }
-    return out;
-}
-
-export const DOG = fromPixels(DOG_PIXELS);
-export const DOG_WIDTH = Math.max(...DOG.map((l) => l.length));
-const GAP = 2;
-
-/**
- * Dog and wordmark side by side, the 6-row wordmark centred against the 8-row dog.
- *
- * ⚠️ The LOCKUP needs 93 columns. That is wider than the 80 most terminals default to, which is why
- * it is the widest of four tiers rather than the only one — a logo that wraps is worse than no logo.
- */
-function lockup(paint, inkArt) {
-    // ⚠️ TWO COLOURS, ONE EACH. A single colour across both made the block a flat slab with nothing
-    // for the name to stand out against; the dog in #EB073D and the name in #A627F5 keeps them
-    // distinct. `inkArt` is passed rather than assumed so a caller can still render the art plain.
-    const pad = Math.floor((DOG.length - FULL.length) / 2);
-    return DOG.map((d, i) => {
-        const word = FULL[i - pad] ?? '';
-        return (inkArt ? inkArt(d) : d).padEnd(DOG_WIDTH + GAP + (inkArt ? inkArt('').length : 0))
-            + (word ? paint(word) : '');
-    });
-}
-export const LOCKUP_WIDTH = DOG_WIDTH + GAP + WORDMARK_WIDTH;
 
 /** Length ignoring escape sequences — the banner builds its own strings, so this stays local. */
 const visible = (s) => s.replace(/\x1b\[[0-9;]*m/g, '').length;
@@ -190,23 +132,14 @@ export function banner({ stream = process.stdout, env = process.env, force = fal
     const paint = (s) => (colour ? `${brand}${s}${RESET}` : s);
     const tagline = 'finds the tests that did not bark';
 
-    // ⚠️ BIGGEST TIER: the full logo, dog above and wordmark beneath. Gated on HEIGHT as well as
-    // width — 67 rows is three screens on a default terminal, and a banner that scrolls the first
-    // thing you wanted to read off the top is worse than a smaller one. `nightbark logo` prints it
-    // unconditionally for when you actually want it.
-    const rows = stream?.rows ?? 24;
-    if (width >= LOGO_WIDTH + 2 && rows >= LOGO_HEIGHT + 12) {
-        return fullLogo({ colour, brand, art: artEscape({ env }), width });
+    // ⚠️ WIDTH ONLY — the height gate is gone, deliberately. It required 79 rows, which almost no
+    // terminal has, so the full logo effectively never appeared and the fallback showed a different
+    // dog instead. Scrolling is a fair price for the art somebody actually chose; a substitute
+    // animal is not.
+    if (width >= LOGO_WIDTH + 2) {
+        return fullLogo({ colour, brand, art: artEscape({ env }), tag: tagEscape({ env }), width });
     }
 
-    // Widest tier: the dog beside the word.
-    if (width >= LOCKUP_WIDTH + 2) {
-        const pad = ' '.repeat(Math.max(0, Math.floor((Math.min(width, 110) - LOCKUP_WIDTH) / 2)));
-        const inkArt = colour ? (s) => `${artEscape({ env })}${s}${RESET}` : null;
-        const lines = lockup(paint, inkArt).map((l) => pad + l);
-        const tagPad = ' '.repeat(Math.max(0, Math.floor((Math.min(width, 110) - tagline.length) / 2)));
-        return ['', ...lines, '', tagPad + (colour ? tagEscape({ env }) + tagline + RESET : tagline), ''].join('\n');
-    }
     if (width >= WORDMARK_WIDTH + 2) {
         const pad = ' '.repeat(Math.max(0, Math.floor((Math.min(width, 100) - WORDMARK_WIDTH) / 2)));
         const lines = FULL.map((l) => pad + paint(l));

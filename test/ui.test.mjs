@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { banner, brandEscape, colourEnabled, BRAND, WORDMARK_WIDTH, DOG, DOG_WIDTH, LOCKUP_WIDTH } from '../src/ui/banner.mjs';
+import { banner, brandEscape, colourEnabled, BRAND, WORDMARK_WIDTH } from '../src/ui/banner.mjs';
 import { createUi, visibleWidth } from '../src/ui/steps.mjs';
 
 /** A fake stream, so terminal behaviour can be asserted without a terminal. */
@@ -26,27 +26,7 @@ test('⛔ nothing is printed when output is NOT a terminal', () => {
     assert.equal(banner({ stream: fake({ isTTY: false }) }), '');
 });
 
-test('the dog renders at the wordmark\'s scale, from a pixel grid', () => {
-    // Six terminal rows of whole blocks is too coarse for a recognisable dog — the first four
-    // attempts were blobs. Half-blocks give 16 vertical pixels in 8 rows, which is just enough for
-    // an ear, a skull and an OPEN jaw. The open jaw matters: earlier passes drew it closed, and a
-    // closed-mouth dog is a poor logo for something called nightbark.
-    assert.equal(DOG.length, 8, 'eight terminal rows');
-    assert.equal(DOG_WIDTH, 20);
-    assert.equal(LOCKUP_WIDTH, DOG_WIDTH + 2 + WORDMARK_WIDTH);
-    for (const row of DOG) assert.ok(row.length <= DOG_WIDTH);
-    // The mouth is a GAP: a row with ink, then space, then ink again.
-    assert.ok(DOG.some((r) => /[█▀▄]\s+[█▀▄]/.test(r)), 'no open jaw — the mouth closed up');
-});
 
-test('the lockup appears ONLY when it fits, and the word is centred against the dog', () => {
-    const wide = banner({ stream: fake({ columns: 110 }), env: { NO_COLOR: '1' }, force: true });
-    const narrow = banner({ stream: fake({ columns: 80 }), env: { NO_COLOR: '1' }, force: true });
-    assert.ok(wide.includes(DOG[0].trimEnd()), 'the dog is present at 110 columns');
-    assert.ok(!narrow.includes(DOG[2].trimEnd()), 'and absent at 80, where the lockup would wrap');
-    assert.ok(narrow.includes('███╗'), 'the wordmark alone still renders at 80');
-    for (const line of wide.split('\n')) assert.ok(visibleWidth(line) <= 110);
-});
 
 test('⚠️ a narrow terminal gets a SMALLER form, never a wrapped one', () => {
     // 71 columns of art does not clip on a narrow terminal — it WRAPS, and six wrapped rows are
@@ -174,19 +154,18 @@ test('the full logo puts the art FIRST and the wordmark beneath it', () => {
     assert.ok(out.some((l) => l.includes('finds the tests that did not bark')));
 });
 
-test('⚠️ the full logo is gated on HEIGHT as well as width', () => {
+test('⛔ the only fallback is the WORDMARK — never a different dog', () => {
     // 67 rows is three screens on a default terminal. A banner that scrolls the thing you wanted to
     // read off the top is worse than a smaller one, so width alone is not enough.
-    const big = banner({ stream: fake({ columns: 120, rows: 90 }), env: { NO_COLOR: '1' }, force: true });
-    const wideShort = banner({ stream: fake({ columns: 120, rows: 24 }), env: { NO_COLOR: '1' }, force: true });
-    const tallNarrow = banner({ stream: fake({ columns: 90, rows: 90 }), env: { NO_COLOR: '1' }, force: true });
+    // ⛔ THE FALLBACK IS THE WORDMARK, NOT A DIFFERENT DOG. A second, smaller dog used to live here
+    // and it meant a 101-column terminal showed one animal while a 111-column one showed another.
+    const wide = banner({ stream: fake({ columns: 120, rows: 24 }), env: { NO_COLOR: '1' }, force: true });
+    const narrow = banner({ stream: fake({ columns: 100, rows: 90 }), env: { NO_COLOR: '1' }, force: true });
 
-    assert.ok(big.includes(LOGO_ART[5]), 'shown when it genuinely fits');
-    assert.ok(!wideShort.includes(LOGO_ART[5]), 'not on a wide but SHORT terminal');
-    assert.ok(!tallNarrow.includes(LOGO_ART[5]), 'not on a tall but NARROW terminal — it would wrap');
-    // and the fallbacks still render something
-    assert.ok(wideShort.includes('███╗'), 'the small lockup takes over');
-    assert.ok(tallNarrow.includes('███╗'));
+    assert.ok(wide.includes(LOGO_ART[5]), 'the art shows on any terminal wide enough, short or not');
+    assert.ok(!narrow.includes(LOGO_ART[5]), 'and never when it would wrap');
+    assert.ok(narrow.includes('███╗'), 'the wordmark alone is the fallback');
+    assert.ok(!/[↓↙↖←]/.test(narrow), 'no partial art leaks into the narrow tier');
 });
 
 test('`logo` prints unconditionally — the gate belongs to the automatic banner, not to asking', () => {
