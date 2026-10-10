@@ -12,7 +12,7 @@ import { adoSink } from '../src/sinks/ado.mjs';
 import { describePublish, publishFailed } from '../src/sinks/sink.mjs';
 import { diagnose, describeDiagnosis } from '../src/sinks/diagnose.mjs';
 import { readFailures, triage } from '../src/triage/index.mjs';
-import { banner } from '../src/ui/banner.mjs';
+import { banner, fullLogo, colourEnabled, brandEscape } from '../src/ui/banner.mjs';
 import { createUi } from '../src/ui/steps.mjs';
 import { triageBrief } from '../src/triage/brief.mjs';
 import { readFileSync } from 'node:fs';
@@ -48,7 +48,7 @@ const KNOWN = {
     verdict: ['answers', 'verdicts', 'sarif'],
     'sink:ado': ['org', 'project', 'plan', 'case', 'suites', 'outcome', 'arm', 'diagnose'],
     triage: ['out', 'json', 'branch', 'commit', 'runner'],
-    selftest: [], selfcheck: [], help: [],
+    selftest: [], selfcheck: [], help: [], logo: [],
 };
 
 const flag = (name) => {
@@ -150,6 +150,13 @@ if (cmd === 'sink:ado') {
         console.log(`\n  ${err.message}\n`);
         process.exit(1);
     }
+}
+
+if (cmd === 'logo') {
+    // Unconditional: the size gate belongs to the automatic banner, not to someone who typed `logo`.
+    const colour = colourEnabled();
+    console.log(fullLogo({ colour, brand: brandEscape() }));
+    process.exit(0);
 }
 
 if (cmd === 'triage') {
@@ -485,6 +492,7 @@ console.log(`
     nightbark sink:ado ...        check an ADO Test Plan scope resolves (read-only unless --arm)
     nightbark sink:ado --diagnose walk the ADO chain one hop at a time; name the rung that broke
     nightbark triage <report>     fingerprint + cluster CI failures; brief the judgement half
+    nightbark logo                print the full logo (109 cols wide)
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);

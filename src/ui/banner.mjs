@@ -9,6 +9,8 @@
  * noise in someone's grep.
  */
 
+import { LOGO_ART, LOGO_WIDTH, LOGO_HEIGHT } from './logo.mjs';
+
 const FULL = [
     '███╗   ██╗██╗ ██████╗ ██╗  ██╗████████╗██████╗  █████╗ ██████╗ ██╗  ██╗',
     '████╗  ██║██║██╔════╝ ██║  ██║╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║ ██╔╝',
@@ -152,6 +154,15 @@ export function banner({ stream = process.stdout, env = process.env, force = fal
     const paint = (s) => (colour ? `${brand}${s}${RESET}` : s);
     const tagline = 'finds the tests that did not bark';
 
+    // ⚠️ BIGGEST TIER: the full logo, dog above and wordmark beneath. Gated on HEIGHT as well as
+    // width — 67 rows is three screens on a default terminal, and a banner that scrolls the first
+    // thing you wanted to read off the top is worse than a smaller one. `nightbark logo` prints it
+    // unconditionally for when you actually want it.
+    const rows = stream?.rows ?? 24;
+    if (width >= LOGO_WIDTH + 2 && rows >= LOGO_HEIGHT + 12) {
+        return fullLogo({ colour, brand, width });
+    }
+
     // Widest tier: the dog beside the word.
     if (width >= LOCKUP_WIDTH + 2) {
         const pad = ' '.repeat(Math.max(0, Math.floor((Math.min(width, 110) - LOCKUP_WIDTH) / 2)));
@@ -179,4 +190,27 @@ export function banner({ stream = process.stdout, env = process.env, force = fal
     if (visible(full) <= width) return `\n ${paint(name)} ${colour ? DIM + '— ' + tagline + RESET : '— ' + tagline}\n`;
     if (visible(` ${name}`) <= width) return `\n ${paint(name)}\n`;
     return '';
+}
+
+/**
+ * The full logo: art, then the wordmark centred beneath it, then the tagline.
+ *
+ * Exported so `nightbark logo` can print it whatever the terminal size — the size GATE belongs to
+ * the automatic banner, not to an explicit request for the logo.
+ */
+export function fullLogo({ colour = true, brand = brandEscape(), width = LOGO_WIDTH } = {}) {
+    const paint = (s) => (colour ? `${brand}${s}${RESET}` : s);
+    const span = Math.max(LOGO_WIDTH, WORDMARK_WIDTH);
+    const pad = ' '.repeat(Math.max(0, Math.floor((span - WORDMARK_WIDTH) / 2)));
+    const tagline = 'finds the tests that did not bark';
+    const tagPad = ' '.repeat(Math.max(0, Math.floor((span - tagline.length) / 2)));
+    return [
+        '',
+        ...LOGO_ART.map((l) => paint(l)),
+        '',
+        ...FULL.map((l) => pad + paint(l)),
+        '',
+        tagPad + (colour ? DIM + tagline + RESET : tagline),
+        '',
+    ].join('\n');
 }

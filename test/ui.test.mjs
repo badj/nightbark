@@ -4,9 +4,9 @@ import { banner, brandEscape, colourEnabled, BRAND, WORDMARK_WIDTH, DOG, DOG_WID
 import { createUi, visibleWidth } from '../src/ui/steps.mjs';
 
 /** A fake stream, so terminal behaviour can be asserted without a terminal. */
-const fake = ({ isTTY = true, columns = 100 } = {}) => {
+const fake = ({ isTTY = true, columns = 100, rows = 24 } = {}) => {
     const out = [];
-    return { isTTY, columns, write: (s) => out.push(s), lines: () => out.join('').split('\n') };
+    return { isTTY, columns, rows, write: (s) => out.push(s), lines: () => out.join('').split('\n') };
 };
 
 // ── the wordmark ───────────────────────────────────────────────────────────────────────────────
@@ -156,4 +156,48 @@ test('the full step sequence renders the gutter shape', () => {
     assert.ok(out.some((l) => l.startsWith('●')), 'notes');
     assert.ok(out.some((l) => l.startsWith('└')), 'closes');
     assert.ok(out.includes('│  /tmp/x'), 'values sit on the gutter');
+});
+
+// ── the full logo ──────────────────────────────────────────────────────────────────────────────
+
+import { fullLogo } from '../src/ui/banner.mjs';
+import { LOGO_ART, LOGO_WIDTH, LOGO_HEIGHT } from '../src/ui/logo.mjs';
+
+test('the full logo puts the art FIRST and the wordmark beneath it', () => {
+    // The arrangement was chosen by eye from two candidates; this pins it so a later refactor
+    // cannot quietly flip them.
+    const out = fullLogo({ colour: false }).split('\n');
+    const artAt = out.findIndex((l) => l.includes(LOGO_ART[0].trim().slice(0, 20)));
+    const wordAt = out.findIndex((l) => l.includes('███╗   ██╗'));
+    assert.ok(artAt >= 0, 'the art is present');
+    assert.ok(wordAt > artAt, 'and the wordmark comes AFTER it');
+    assert.ok(out.some((l) => l.includes('finds the tests that did not bark')));
+});
+
+test('⚠️ the full logo is gated on HEIGHT as well as width', () => {
+    // 67 rows is three screens on a default terminal. A banner that scrolls the thing you wanted to
+    // read off the top is worse than a smaller one, so width alone is not enough.
+    const big = banner({ stream: fake({ columns: 120, rows: 90 }), env: { NO_COLOR: '1' }, force: true });
+    const wideShort = banner({ stream: fake({ columns: 120, rows: 24 }), env: { NO_COLOR: '1' }, force: true });
+    const tallNarrow = banner({ stream: fake({ columns: 90, rows: 90 }), env: { NO_COLOR: '1' }, force: true });
+
+    assert.ok(big.includes(LOGO_ART[5]), 'shown when it genuinely fits');
+    assert.ok(!wideShort.includes(LOGO_ART[5]), 'not on a wide but SHORT terminal');
+    assert.ok(!tallNarrow.includes(LOGO_ART[5]), 'not on a tall but NARROW terminal — it would wrap');
+    // and the fallbacks still render something
+    assert.ok(wideShort.includes('███╗'), 'the small lockup takes over');
+    assert.ok(tallNarrow.includes('███╗'));
+});
+
+test('`logo` prints unconditionally — the gate belongs to the automatic banner, not to asking', () => {
+    const out = fullLogo({ colour: false });
+    assert.equal(out.split('\n').filter((l) => l.trim()).length, LOGO_HEIGHT + 6 + 1, 'art + wordmark + tagline');
+    assert.ok(!out.includes('\x1b['), 'colour: false means no escapes');
+});
+
+test('the stored art is intact — 67 rows, no row wider than it claims', () => {
+    assert.equal(LOGO_HEIGHT, 67);
+    assert.equal(LOGO_WIDTH, 109);
+    for (const row of LOGO_ART) assert.ok(row.length <= LOGO_WIDTH, `a row is ${row.length} wide`);
+    assert.ok(LOGO_ART[0].trim().length > 0 && LOGO_ART[LOGO_HEIGHT - 1].trim().length > 0, 'no blank edges');
 });
