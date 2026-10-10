@@ -194,6 +194,60 @@ than sent. Azure answers an unauthenticated call with **203 and an HTML sign-in 
 parsed naively that becomes an empty result set, and the caller reports a clean run against a plan it
 never reached.
 
+## `triage` — fingerprint CI failures, then brief the judgement
+
+```bash
+nightbark triage playwright-report.json --out brief.md
+```
+
+Adopted from the `ai-bug-triage` discipline, split along the seam
+[ADR-0007](docs/adr/0007-triage-is-a-gate-with-a-brief.md) draws: **steps 1-4 are a gate, steps 5-6
+are a brief, step 7 is a person.**
+
+| | | |
+| --- | --- | --- |
+| 1-4 | normalise · anchor · hash · cluster | pure functions, no model, no network |
+| 5-6 | severity · category · root cause · ticket prose | a markdown brief any agent can answer |
+| 7 | create / merge / close | **a human, always** |
+
+⛔ **Deduplication is never a model's job.** Asked twice whether two errors match, a model may answer
+differently — and a dedup that is not reproducible merges distinct bugs at random, hiding a live bug
+behind a ticket somebody already closed. A SHA-256 of a canonical form answers identically every
+time, which is the only property that makes a merge safe to *suggest*.
+
+So nothing is filed. The output is groups and **links**, each carrying its score and the dimensions
+that produced it:
+
+```
+  d0dcbd50b73c3907  x2   Error  ⚠️ flaky 2/2
+      timeout 30000ms exceeded waiting for selector
+      waitForSelector(login.ts)
+  585186c83c38a0be  x1   TypeError
+      Cannot read property 'vendorId' of undefined
+      processOrder(order.ts) -> groupByVendor(order.ts)
+
+  near-duplicates — SUGGESTIONS, not merges:
+      585186c83c38a0be ~ e124dcf8dcc76c82  score 0.9 (duplicate)
+          matched: exceptionType, messageTemplate, frames, component
+```
+
+Two failures in different test files, with different line numbers, recognised as one root cause —
+and kept as separate fingerprints so you can still see which tests are affected.
+
+### ⚠️ Writing it down found two defects the prose had held
+
+- **The spec contradicts itself.** Step 2b says *"replace quoted strings with `<STR>`"*; Test 5
+  requires `'name'` and `'email'` to stay distinct. Both cannot hold. Resolved by length — a short
+  quoted token is part of the template, a long one is a specific. *Where a spec's example disagrees
+  with its rule, the example is what somebody actually wanted.*
+- **The reference Playwright extractor reads one level of suites,** and Playwright nests them — so
+  every failure inside a `describe` block was silently skipped.
+
+Neither is a criticism of the discipline; prose cannot execute. It is what
+[ADR-0002](docs/adr/0002-gates-not-prose.md) means. The five fingerprint stability assertions are
+tests now, and the clustering weights are asserted to sum to exactly **1.00**, because every
+threshold is calibrated against that total.
+
 ## Installing
 
 ```bash
@@ -269,6 +323,7 @@ The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing d
 | [ADR-0003](docs/adr/0003-targets-and-app-under-test.md) | What we audit, and the app we scaffold against |
 | [ADR-0004](docs/adr/0004-where-the-smarts-live.md) | Gates first; agents only where judgement is required |
 | [INTEGRATIONS](docs/INTEGRATIONS.md) | Emit SARIF / JUnit / exit codes — don't build connectors |
+| [ADR-0007](docs/adr/0007-triage-is-a-gate-with-a-brief.md) | Bug triage is a gate with a brief, not an agent with a prompt |
 | [CONTRACTS](docs/CONTRACTS.md) | ⚠️ What each layer is verified against — and the one gap that is still open |
 
 ## Status

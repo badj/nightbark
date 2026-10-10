@@ -11,6 +11,10 @@ import { init } from '../src/init/index.mjs';
 import { adoSink } from '../src/sinks/ado.mjs';
 import { describePublish, publishFailed } from '../src/sinks/sink.mjs';
 import { diagnose, describeDiagnosis } from '../src/sinks/diagnose.mjs';
+import { readFailures, triage } from '../src/triage/index.mjs';
+import { banner } from '../src/ui/banner.mjs';
+import { createUi } from '../src/ui/steps.mjs';
+import { triageBrief } from '../src/triage/brief.mjs';
 import { readFileSync } from 'node:fs';
 import { selftest } from '../src/selftest.mjs';
 import { selfcheck } from '../src/selfcheck.mjs';
@@ -43,6 +47,7 @@ const KNOWN = {
     challenge: ['out'],
     verdict: ['answers', 'verdicts', 'sarif'],
     'sink:ado': ['org', 'project', 'plan', 'case', 'suites', 'outcome', 'arm', 'diagnose'],
+    triage: ['out', 'json', 'branch', 'commit', 'runner'],
     selftest: [], selfcheck: [], help: [],
 };
 
@@ -147,34 +152,156 @@ if (cmd === 'sink:ado') {
     }
 }
 
+if (cmd === 'triage') {
+    // ⛔ DETERMINISTIC HALF ONLY. Normalise, anchor, hash, cluster - steps 1-4 - then hand the
+    // judgement out as a brief. Per ADR-0004 deduplication is NOT an agent's job: a model asked
+    // twice whether two errors match may answer differently, and a dedup that is not reproducible
+    // merges distinct bugs at random. Nothing is created, closed or merged here; that is a human.
+    const src = rest.find((a) => !a.startsWith('--') && a !== 'triage');
+    if (!src) {
+        console.log(`
+  usage: nightbark triage <report.json|log|dir> [--out brief.md] [--json out.json]
+                          [--branch x] [--commit sha] [--runner os]
+
+  Reads a Playwright JSON report, a JSON array of failures, a raw log, or a directory of them.
+  Fingerprints each failure deterministically (same failure -> same 16-hex id, every run), groups
+  exact duplicates, and LINKS near-duplicates with a score and the dimensions that matched.
+
+  --out writes the brief for the judgement half (severity, category, root cause, ticket prose),
+  which any agent can answer. Nothing is filed: a wrong merge hides a live bug behind a closed
+  ticket, so creating and merging stay with a person.
+`);
+        process.exit(1);
+    }
+
+    let failures;
+    try {
+        failures = readFailures(src);
+    } catch (err) {
+        // ⚠️ Loudly. "0 failures" and "I could not read your report" must never look the same.
+        console.log(`\n  ${err.message}\n`);
+        process.exit(1);
+    }
+
+    const result = triage(failures);
+    const context = Object.fromEntries(
+        [['branch', flag('branch')], ['commit', flag('commit')], ['runner', flag('runner')]].filter(([, v]) => v),
+    );
+
+    console.log(`\n  nightbark triage — ${src}`);
+    console.log(`  ${result.total} failure(s) · ${result.groups.length} distinct fingerprint(s)`
+        + `${result.links.length ? ` · ${result.links.length} near-duplicate link(s)` : ''}`
+        + `${result.unanchored.length ? ` · \u26a0\ufe0f ${result.unanchored.length} unanchored` : ''}\n`);
+
+    for (const g of result.groups) {
+        const flaky = g.retried ? `  \u26a0\ufe0f flaky ${g.flakyCount}/${g.count}` : '';
+        console.log(`  ${g.fingerprint}  x${String(g.count).padEnd(3)} ${g.anchors.exceptionType ?? '(no type)'}${flaky}`);
+        console.log(`      ${(g.anchors.messageTemplate ?? '(no message)').slice(0, 96)}`);
+        if (g.anchors.frames?.length) console.log(`      ${g.anchors.frames.join(' -> ')}`);
+        for (const m of g.members.slice(0, 3)) console.log(`      · ${m.testName ?? '(unnamed)'}`);
+        if (g.members.length > 3) console.log(`      · …and ${g.members.length - 3} more`);
+    }
+
+    if (result.links.length) {
+        console.log(`\n  near-duplicates — SUGGESTIONS, not merges:`);
+        for (const l of result.links) {
+            const why = Object.entries(l.parts).filter(([, v]) => v > 0).map(([k]) => k).join(', ');
+            console.log(`      ${l.a} ~ ${l.b}  score ${l.score} (${l.verdict})  matched: ${why}`);
+        }
+    }
+
+    if (result.unanchored.length) {
+        console.log(`\n  \u26a0\ufe0f ${result.unanchored.length} failure(s) yielded no stable anchor, so they carry NO fingerprint`);
+        console.log(`      and are deliberately NOT clustered — pooling them would make one large false group.`);
+    }
+
+    const outPath = flag('out');
+    if (outPath) {
+        writeFileSync(outPath, triageBrief(result, { target: src, context }));
+        console.log(`\n  brief written: ${outPath}  (${result.groups.length} group(s) to judge)`);
+    }
+    const jsonPath = flag('json');
+    if (jsonPath) {
+        writeFileSync(jsonPath, JSON.stringify({
+            total: result.total,
+            groups: result.groups.map((g) => ({
+                fingerprint: g.fingerprint, count: g.count, flakyRate: g.flakyRate,
+                anchors: g.anchors, tests: g.members.map((m) => m.testName),
+            })),
+            links: result.links,
+            unanchored: result.unanchored.length,
+        }, null, 2));
+        console.log(`  json written:  ${jsonPath}`);
+    }
+    console.log('');
+    process.exit(0);
+}
+
 if (cmd === 'init') {
     const dir = rest.find((a) => !a.startsWith('--') && a !== 'init');
     if (!dir) { console.log('\n  usage: nightbark init <dir> [--base-url http://localhost:3000] [--force]\n'); process.exit(1); }
-    try {
-        const { target, name, files } = init(dir, {
-            baseURL: flag('base-url') ?? 'http://localhost:3000',
-            force: bool('force'),
-        });
-        console.log(`\n  scaffolded ${name} -> ${target}\n`);
-        for (const f of files) console.log(`      ${f}`);
-        console.log(`
-  Next:
-      cd ${dir}
-      npm install && npx playwright install chromium
-      npm test            # one test FAILS to be found by the audit, see below
-      npm run audit       # nightbark flags tests/vacuous.spec.ts
 
-  \u26a0\ufe0f  Two things need your attention before this suite is honest:
-      1. tests/fixtures/pool.ts - release() is a STUB. Until it is wired up your suite
-         accumulates state, and the second run of the day fails on data the first left behind.
-      2. tests/vacuous.spec.ts is deliberately broken. Fix it, watch the finding disappear,
-         then delete it.
-`);
-        process.exit(0);
+    // ⛔ A CONFIRMATION SURFACE, NOT A CONFIGURATION ONE. ADR-0006 refusal 1 is "one layout, no
+    // --with-x", and this does not ask what to build — it shows what is about to be written,
+    // including the deliberately broken test, and asks only whether to go ahead. Showing the
+    // planted fault BEFORE it lands is strictly better than surprising someone with it afterwards.
+    //
+    // ⚠️ And it is TTY-gated. On a pipe or in CI there is no banner and no prompt, so the command
+    // stays scriptable — a prompt that blocks forever in CI is the worst of both worlds.
+    const interactive = Boolean(process.stdout.isTTY);
+    const ui = createUi();
+
+    if (interactive) {
+        process.stdout.write(banner());
+        ui.intro('nightbark');
+        ui.step('Target', resolve(dir));
+        ui.box('What will be written, and why each piece is load-bearing', [
+            'playwright.config.ts        workers 4 · fullyParallel · retries 0',
+            'tests/fixtures/pool.ts      a per-worker allocator + a teardown STUB',
+            'tests/fixtures/index.ts     the fixture that hands one identity per worker',
+            'tests/example.spec.ts       one honest passing test',
+            'tests/vacuous.spec.ts       \u26a0\ufe0f  DELIBERATELY broken \u2014 the audit finds it',
+            '.github/workflows/ci.yml    generated from ci/pipeline.mjs',
+            'azure-pipelines.yml         the SAME definition, second platform',
+            'package.json · tsconfig.json · .gitignore · README.md',
+        ]);
+        ui.note('Two of those need your attention afterwards: release() is a stub, and');
+        ui.note('tests/vacuous.spec.ts is broken on purpose. The README says why.');
+        if (!(await ui.confirm('Scaffold it?'))) {
+            ui.outro('Nothing written.');
+            process.exit(0);
+        }
+    }
+
+    try {
+        // ⚠️ `baseURL`, capital URL — the option init actually takes. Spelled `baseUrl` it is
+        // silently ignored and --base-url does nothing, which is the quietest kind of broken flag.
+        const { files: written, name } = init(dir, { baseURL: flag('base-url') ?? 'http://localhost:3000', force: bool('force') });
+        if (interactive) {
+            ui.step(`Scaffolded ${name} — ${written.length} file(s)`, written.join('\n'));
+            ui.box('Next', [
+                `cd ${dir}`,
+                'npm install && npx playwright install chromium',
+                'npm test          # the vacuous test PASSES \u2014 that is the point',
+                'npm run audit     # nightbark flags it',
+            ]);
+            ui.outro('Done!  Fix the planted fault, watch the finding disappear, then delete it.');
+        } else {
+            console.log(`\n  scaffolded ${name} -> ${dir} \u2014 ${written.length} file(s)\n`);
+            for (const f of written) console.log(`      ${f}`);
+            console.log('\n  Next:');
+            console.log(`      cd ${dir}`);
+            console.log('      npm install && npx playwright install chromium');
+            console.log('      npm test            # one test PASSES while proving nothing');
+            console.log('      npm run audit       # nightbark flags tests/vacuous.spec.ts\n');
+            console.log('  \u26a0\ufe0f  release() in tests/fixtures/pool.ts is a STUB, and tests/vacuous.spec.ts is');
+            console.log('      deliberately broken. The generated README explains both.\n');
+        }
     } catch (err) {
         console.log(`\n  ${err.message}\n`);
         process.exit(1);
     }
+    process.exit(0);
 }
 
 if (cmd === 'brief') {
@@ -357,6 +484,7 @@ console.log(`
     nightbark verdict <p> ...     merge judge + Moriarty into findings (--sarif, --fail-on)
     nightbark sink:ado ...        check an ADO Test Plan scope resolves (read-only unless --arm)
     nightbark sink:ado --diagnose walk the ADO chain one hop at a time; name the rung that broke
+    nightbark triage <report>     fingerprint + cluster CI failures; brief the judgement half
 
   ${gates.length} gate(s) registered: ${gates.map((g) => g.id).join(', ')}
 `);
