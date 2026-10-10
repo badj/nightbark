@@ -251,3 +251,13 @@ test('a colour degrades through all three depths', () => {
     assert.equal(artEscape({ env: { COLORTERM: 'truecolor' } }), `\x1b[38;2;${ART.rgb.join(';')}m`);
     assert.equal(tagEscape({ env: { COLORTERM: 'truecolor' } }), `\x1b[38;2;${TAG.rgb.join(';')}m`);
 });
+
+test('a multi-line note continues on the GUTTER, not with a second bullet', () => {
+    // Two ● markers read as two separate remarks, so one sentence wrapped across them looks like a
+    // formatting accident — which is exactly how it looked on the first real run.
+    const s = fake();
+    createUi({ stream: s, env: { NO_COLOR: '1' }, colour: false }).note('first line\nsecond line');
+    const lines = s.lines().filter((l) => l.trim());
+    assert.equal(lines.filter((l) => l.startsWith('●')).length, 1, 'exactly one bullet');
+    assert.ok(lines.some((l) => l === '│  second line'), 'the continuation sits on the gutter');
+});

@@ -61,7 +61,17 @@ export function createUi({ stream = process.stdout, env = process.env, colour = 
             w(c(DIM, G.bar));
         },
 
-        note(label) { w(`${c(YELLOW, G.dot)}  ${label}`); w(c(DIM, G.bar)); },
+        /**
+         * A caveat. Multi-line notes continue on the GUTTER rather than growing a second bullet —
+         * two ● markers read as two separate remarks, so a single sentence wrapped across them
+         * looks like a formatting accident, which is exactly how it looked on the first real run.
+         */
+        note(label) {
+            const [first, ...rest] = String(label).split('\n');
+            w(`${c(YELLOW, G.dot)}  ${first}`);
+            for (const line of rest) w(`${c(DIM, G.bar)}  ${line}`);
+            w(c(DIM, G.bar));
+        },
 
         /**
          * The summary box. Width is driven by the CONTENT, clamped to the terminal — a fixed width

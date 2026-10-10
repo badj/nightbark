@@ -272,8 +272,8 @@ if (cmd === 'init') {
             'azure-pipelines.yml         the SAME definition, second platform',
             'package.json · tsconfig.json · .gitignore · README.md',
         ]);
-        ui.note('Two of those need your attention afterwards: release() is a stub, and');
-        ui.note('tests/vacuous.spec.ts is broken on purpose. The README says why.');
+        ui.note('Two of those need your attention afterwards: release() is a stub, and\n'
+            + 'tests/vacuous.spec.ts is broken on purpose. The README says why.');
         if (!(await ui.confirm('Scaffold it?'))) {
             ui.outro('Nothing written.');
             process.exit(0);
