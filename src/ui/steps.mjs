@@ -1,4 +1,5 @@
 import { createInterface } from 'node:readline';
+import { brandEscape } from './banner.mjs';
 
 /**
  * A stepped terminal UI — the gutter-and-diamond shape, implemented here rather than depended on.
@@ -43,12 +44,15 @@ export function visibleWidth(s) {
 }
 
 export function createUi({ stream = process.stdout, env = process.env, colour = undefined } = {}) {
+    const brand = brandEscape({ env });
     const paint = colour ?? ((env.NO_COLOR === undefined || env.NO_COLOR === '') && Boolean(stream.isTTY));
     const c = (code, s) => (paint ? `${code}${s}${RESET}` : s);
     const w = (s = '') => stream.write(`${s}\n`);
 
     return {
-        intro(title) { w(''); w(`${c(DIM, G.top)}   ${title} `); w(c(DIM, G.bar)); },
+        // The product name carries the brand colour here too — it was plain, which made the one
+        // place the name appears on EVERY run the one place it was not branded.
+        intro(title) { w(''); w(`${c(DIM, G.top)}   ${paint ? brand + title + RESET : title} `); w(c(DIM, G.bar)); },
 
         /** One completed step, optionally with the value it produced on the gutter line below. */
         step(label, value) {

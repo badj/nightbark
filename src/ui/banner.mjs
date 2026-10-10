@@ -91,12 +91,15 @@ const GAP = 2;
  * ⚠️ The LOCKUP needs 93 columns. That is wider than the 80 most terminals default to, which is why
  * it is the widest of four tiers rather than the only one — a logo that wraps is worse than no logo.
  */
-function lockup(paint, dim, colour) {
+function lockup(paint) {
+    // ⚠️ THE NAME IS BRANDED, THE DOG IS NOT. Colouring both made the whole block one flat slab of
+    // purple, which reads as a wall rather than a logo — the wordmark has nothing to stand out
+    // against. The art keeps the terminal's own foreground so the name is the thing that carries
+    // the colour.
     const pad = Math.floor((DOG.length - FULL.length) / 2);
     return DOG.map((d, i) => {
         const word = FULL[i - pad] ?? '';
-        const left = d.padEnd(DOG_WIDTH + GAP);
-        return paint(left) + (word ? paint(word) : '');
+        return d.padEnd(DOG_WIDTH + GAP) + (word ? paint(word) : '');
     });
 }
 export const LOCKUP_WIDTH = DOG_WIDTH + GAP + WORDMARK_WIDTH;
@@ -135,6 +138,21 @@ export const BRAND = { hex: 'A627F5', rgb: [166, 39, 245], xterm256: 129 };
 export function brandEscape({ env = process.env } = {}) {
     const ct = (env.COLORTERM ?? '').toLowerCase();
     if (ct.includes('truecolor') || ct.includes('24bit')) return `\x1b[38;2;${BRAND.rgb.join(';')}m`;
+
+    // ⚠️ COLORTERM IS OFTEN UNSET even on terminals that handle 24-bit colour perfectly well — it was
+    // unset on the author's own machine, so the brand colour silently degraded to xterm 129
+    // (#af00ff), which is close enough to look right and wrong enough not to be the brand. Detecting
+    // only COLORTERM means the exact hex almost never ships.
+    //
+    // So: two more signals, both existing conventions rather than anything invented here.
+    // FORCE_COLOR=3 is the established "16 million colours" level; TERM_PROGRAM names the emulator
+    // for the common ones that support it. ⛔ Apple's Terminal.app is deliberately NOT on that list —
+    // it genuinely has no 24-bit support, and claiming otherwise would make the logo worse there.
+    if ((env.FORCE_COLOR ?? '') === '3') return `\x1b[38;2;${BRAND.rgb.join(';')}m`;
+    const prog = (env.TERM_PROGRAM ?? '').toLowerCase();
+    if (['iterm.app', 'vscode', 'wezterm', 'hyper', 'ghostty', 'rio', 'tabby'].includes(prog)) {
+        return `\x1b[38;2;${BRAND.rgb.join(';')}m`;
+    }
     if ((env.TERM ?? '').includes('256color')) return `\x1b[38;5;${BRAND.xterm256}m`;
     return '\x1b[1;35m';
 }
@@ -206,7 +224,8 @@ export function fullLogo({ colour = true, brand = brandEscape(), width = LOGO_WI
     const tagPad = ' '.repeat(Math.max(0, Math.floor((span - tagline.length) / 2)));
     return [
         '',
-        ...LOGO_ART.map((l) => paint(l)),
+        // The art is left in the terminal's own colour; only the name is branded.
+        ...LOGO_ART,
         '',
         ...FULL.map((l) => pad + paint(l)),
         '',

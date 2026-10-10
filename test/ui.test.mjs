@@ -201,3 +201,29 @@ test('the stored art is intact — 67 rows, no row wider than it claims', () => 
     for (const row of LOGO_ART) assert.ok(row.length <= LOGO_WIDTH, `a row is ${row.length} wide`);
     assert.ok(LOGO_ART[0].trim().length > 0 && LOGO_ART[LOGO_HEIGHT - 1].trim().length > 0, 'no blank edges');
 });
+
+test('⛔ in the full logo ONLY the name is branded — the art stays the terminal\'s colour', () => {
+    // Colouring both made the block one flat slab of purple, which reads as a wall rather than a
+    // logo: the wordmark has nothing to stand out against.
+    const brand = brandEscape({ env: { COLORTERM: 'truecolor' } });
+    const out = fullLogo({ colour: true, brand }).split('\n').filter((l) => l.trim());
+    const branded = out.filter((l) => l.includes(brand));
+    assert.equal(branded.length, 6, 'exactly the six wordmark rows');
+    for (const l of branded) assert.ok(/[█╗╚═]/.test(l), 'and they are wordmark rows, not art');
+    // Every art row must be untouched.
+    for (const art of LOGO_ART) {
+        if (!art.trim()) continue;
+        assert.ok(out.some((l) => l === art), 'an art row was modified');
+    }
+});
+
+test('⚠️ truecolour is detected beyond COLORTERM, which is routinely unset', () => {
+    // It was unset on the author's own machine, so the brand silently degraded to xterm 129
+    // (#af00ff) — near enough to look right, wrong enough not to be the brand.
+    const exact = `\x1b[38;2;${BRAND.rgb.join(';')}m`;
+    assert.equal(brandEscape({ env: { FORCE_COLOR: '3' } }), exact, 'the established 16m convention');
+    assert.equal(brandEscape({ env: { TERM_PROGRAM: 'iTerm.app' } }), exact);
+    assert.equal(brandEscape({ env: { TERM_PROGRAM: 'vscode' } }), exact);
+    // ⛔ Apple Terminal genuinely has no 24-bit support; claiming it does makes the logo worse.
+    assert.equal(brandEscape({ env: { TERM_PROGRAM: 'Apple_Terminal', TERM: 'xterm-256color' } }), `\x1b[38;5;${BRAND.xterm256}m`);
+});
