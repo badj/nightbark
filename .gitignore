@@ -4,3 +4,6 @@ node_modules/
 /tmp/
 .nightbark/
 .nightbark-denylist
+
+# Local npm credentials/notes - never commit (repo is public)
+npm-keys.md
