@@ -43,21 +43,3 @@ is not.
 
 Before any commit, the repo must contain no client-identifying strings. This is enforceable and will
 become a gate in Phase 1 rather than a habit — see [ADR-0002](0002-gates-not-prose.md).
-
-## ⚠️ Open exception, recorded 2026-10-10 — the full logo art
-
-`src/ui/logo.mjs` holds an image-to-ASCII conversion of a **watermarked stock illustration**
-(Dreamstime), produced by the author. A conversion is a derivative work: the glyph arrangement is
-mechanical, but what it depicts is somebody else's drawing.
-
-That is acceptable in a private repository and **not** acceptable in a public one — least of all in
-a README header, which is the most exposed place a logo can sit.
-
-**Before this repo goes public, that art must be redrawn as original work.** The composition is
-fine to keep; the conversion is not. The small banner dog (`DOG` in `src/ui/banner.mjs`) is already
-original and needs nothing.
-
-Recorded here rather than left as a source comment because this ADR's whole subject is not shipping
-content we do not own, and a tool that enforces a rule on its users should not quietly break it on
-itself. An exception that is written down is a decision; one that is not is a leak waiting to be
-found by somebody else.

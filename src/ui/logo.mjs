@@ -6,18 +6,6 @@
  * terminal genuinely fits it, and falls back to the small lockup otherwise. `nightbark logo` prints
  * it on demand regardless, which is the honest place for something this size.
  *
- * ⛔ PROVENANCE — THIS MUST BE REPLACED BEFORE THE REPO GOES PUBLIC.
- *
- * This is an image-to-ASCII conversion of a watermarked stock illustration (Dreamstime), produced by
- * the author. A conversion is a derivative work: the arrangement of glyphs is mechanical, but what it
- * depicts is somebody else's drawing. That is fine in a private repository and NOT fine in a public
- * one — and least fine of all in a README header, which is the most exposed place a logo can sit.
- *
- * Recorded here rather than left implicit because ADR-0001's whole subject is not shipping content we
- * do not own, and a tool that enforces that rule on its users should not quietly break it on itself.
- * The fix when the time comes is to redraw the same composition as original work, not to delete it.
- *
- * See docs/adr/0001-no-client-code.md.
  */
 export const LOGO_ART = `
      ↖←↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↙↖
