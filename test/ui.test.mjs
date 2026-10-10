@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { banner, brandEscape, colourEnabled, BRAND, WORDMARK_WIDTH } from '../src/ui/banner.mjs';
+import { banner, brandEscape, colourEnabled, BRAND, WORDMARK_WIDTH, DOG, DOG_WIDTH, LOCKUP_WIDTH } from '../src/ui/banner.mjs';
 import { createUi, visibleWidth } from '../src/ui/steps.mjs';
 
 /** A fake stream, so terminal behaviour can be asserted without a terminal. */
@@ -12,7 +12,9 @@ const fake = ({ isTTY = true, columns = 100 } = {}) => {
 // ── the wordmark ───────────────────────────────────────────────────────────────────────────────
 
 test('every row of the wordmark is the SAME width — a ragged row is a broken glyph', () => {
-    const lines = banner({ stream: fake(), env: { NO_COLOR: '1' }, force: true }).split('\n').filter((l) => l.includes('█') || l.includes('╚'));
+    // ⚠️ 80 columns pins this to the wordmark-ONLY tier. At 100 the lockup renders and the dog's
+    // eight rows join the six, which is what this assertion caught when the dog was added.
+    const lines = banner({ stream: fake({ columns: 80 }), env: { NO_COLOR: '1' }, force: true }).split('\n').filter((l) => l.includes('█') || l.includes('╚'));
     assert.equal(lines.length, 6, 'ANSI Shadow is six rows');
     const widths = new Set(lines.map((l) => l.trimStart().length));
     assert.equal(widths.size, 1, `rows differ in width: ${[...widths].join(',')} — a glyph is malformed`);
@@ -22,6 +24,28 @@ test('every row of the wordmark is the SAME width — a ragged row is a broken g
 test('⛔ nothing is printed when output is NOT a terminal', () => {
     // A banner in a CI log or a piped file is noise in somebody's grep.
     assert.equal(banner({ stream: fake({ isTTY: false }) }), '');
+});
+
+test('the dog renders at the wordmark\'s scale, from a pixel grid', () => {
+    // Six terminal rows of whole blocks is too coarse for a recognisable dog — the first four
+    // attempts were blobs. Half-blocks give 16 vertical pixels in 8 rows, which is just enough for
+    // an ear, a skull and an OPEN jaw. The open jaw matters: earlier passes drew it closed, and a
+    // closed-mouth dog is a poor logo for something called nightbark.
+    assert.equal(DOG.length, 8, 'eight terminal rows');
+    assert.equal(DOG_WIDTH, 20);
+    assert.equal(LOCKUP_WIDTH, DOG_WIDTH + 2 + WORDMARK_WIDTH);
+    for (const row of DOG) assert.ok(row.length <= DOG_WIDTH);
+    // The mouth is a GAP: a row with ink, then space, then ink again.
+    assert.ok(DOG.some((r) => /[█▀▄]\s+[█▀▄]/.test(r)), 'no open jaw — the mouth closed up');
+});
+
+test('the lockup appears ONLY when it fits, and the word is centred against the dog', () => {
+    const wide = banner({ stream: fake({ columns: 110 }), env: { NO_COLOR: '1' }, force: true });
+    const narrow = banner({ stream: fake({ columns: 80 }), env: { NO_COLOR: '1' }, force: true });
+    assert.ok(wide.includes(DOG[0].trimEnd()), 'the dog is present at 110 columns');
+    assert.ok(!narrow.includes(DOG[2].trimEnd()), 'and absent at 80, where the lockup would wrap');
+    assert.ok(narrow.includes('███╗'), 'the wordmark alone still renders at 80');
+    for (const line of wide.split('\n')) assert.ok(visibleWidth(line) <= 110);
 });
 
 test('⚠️ a narrow terminal gets a SMALLER form, never a wrapped one', () => {
@@ -64,7 +88,7 @@ test('NO_COLOR and FORCE_COLOR are honoured — the conventions that already exi
     assert.equal(colourEnabled({ env: { TERM: 'dumb' }, stream: fake() }), false);
     assert.equal(colourEnabled({ env: { FORCE_COLOR: '1' }, stream: fake({ isTTY: false }) }), true);
     assert.equal(colourEnabled({ env: {}, stream: fake({ isTTY: false }) }), false);
-    assert.ok(!banner({ stream: fake(), env: { NO_COLOR: '1' }, force: true }).includes('\x1b['), 'no escapes at all');
+    assert.ok(!banner({ stream: fake({ columns: 80 }), env: { NO_COLOR: '1' }, force: true }).includes('\x1b['), 'no escapes at all');
 });
 
 // ── the stepped box ────────────────────────────────────────────────────────────────────────────
