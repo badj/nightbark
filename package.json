@@ -1,6 +1,6 @@
 {
     "name": "@obvioapac/nightbark",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Finds the tests that did not bark - assertions that cannot fail, fixtures that collide, and detectors that were never able to fire.",
     "license": "MIT",
     "author": "JJ (Jacob) Badenhorst",

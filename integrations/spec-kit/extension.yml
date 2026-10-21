@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: nightbark
   name: "nightbark — tests that pass while proving nothing"
-  version: "0.1.0"
+  version: "0.2.0"
   description: "Audit the tests an implementation produced: fixed waits, serialised suites, shared test identities, lying requirement links, and assertions whose premise was never established."
   author: "JJ (Jacob) Badenhorst"
   repository: https://github.com/badj/nightbark
