@@ -40,6 +40,7 @@
         "src/",
         "ci/",
         "fixtures/",
+        "integrations/",
         "docs/",
         "README.md",
         "LICENSE"

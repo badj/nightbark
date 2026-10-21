@@ -83,7 +83,7 @@ Corollary: when a stated figure and a fresh run disagree, **re-measure before ed
 
 ---
 
-## The seven decisions (docs/adr/)
+## The eight decisions (docs/adr/)
 
 | | |
 | --- | --- |
@@ -94,6 +94,7 @@ Corollary: when a stated figure and a fresh run disagree, **re-measure before ed
 | [ADR-0005](docs/adr/0005-how-an-irregular-runs.md) | Irregulars **gather locally, judge elsewhere**. No API key, no vendor |
 | [ADR-0006](docs/adr/0006-what-init-scaffolds.md) | `init` scaffolds only what is expensive to retrofit. **Three written refusals** |
 | [ADR-0007](docs/adr/0007-triage-is-a-gate-with-a-brief.md) | Triage is a gate with a brief, not an agent with a prompt |
+| [ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md) | spec-kit requirements are **context for the judge, not a gate** (the gate scored 0/4). Ships a spec-kit extension |
 
 **Read ADR-0002 and ADR-0004 before adding anything.** Most "should this be an agent?" questions are
 already answered there, with measurements.
@@ -103,7 +104,7 @@ already answered there, with measurements.
 ## State
 
 ```bash
-npm run selftest    # 4 gates / 8 proofs + ADR-0001 self-check + CI drift + ~160 tests
+npm run selftest    # 4 gates / 8 proofs + ADR-0001 self-check + CI drift + 186 tests (2026-10-21)
 npm run audit       # audit this repo's own fixtures
 ```
 
@@ -111,7 +112,9 @@ npm run audit       # audit this repo's own fixtures
 `verdict` · `triage` · `sink:ado` (+ `--diagnose`) · `logo`
 
 **Gates (4):** `fixed-wait`, `serialised-suite`, `traceability`, `shared-test-identity`
-**Irregular (1):** vacuity, with Moriarty as the adversarial pass
+**Irregular (1):** vacuity, with Moriarty as the adversarial pass. Shows cited spec-kit `FR-`/`SC-`
+requirements as context ([ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md))
+**Integration:** a spec-kit extension at `integrations/spec-kit/`, hooked `after_implement`
 
 ### Measured, 2026-10-10
 
@@ -128,6 +131,16 @@ that ever existed.
 
 Vacuity Irregular: **33% judge-alone → 100% with Moriarty.** That gap is the whole argument for the
 adversarial pass.
+
+### Measured, 2026-10-21: 13 public spec-kit repos ([ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md))
+
+**1009 findings**: fixed-wait 932, serialised-suite 53, shared-test-identity 24, traceability 0.
+Fixed-wait on a seeded sample of 30, hand-checked: **22 real**. 7 of the 8 misses are one new class,
+pauses in **demo/recording specs**. A separate population from the 2026-10-10 figures: do not sum them.
+
+⚠️ The first run used sparse clones that checked out only `*.spec.ts`/`*.test.ts`, so `.tsx`/`.jsx`/
+`.cjs` tests were missing. It reported 894. **Before auditing a clone, check that every test-named
+file git tracks is on disk.**
 
 ---
 
@@ -194,5 +207,10 @@ package that could not run its own selftest; the ADR-0001 self-check caught two 
    failing, from the registry). The repo was made public the same day. ⚠️ The npm page shows the
    README **as published** — README edits reach npm only with a new version. Publishing needs a TTY
    for npm's browser 2FA approval, so it is run from the author's terminal, not from an agent shell.
+
+4. **fixed-wait: demo/recording pacing** is a false-positive class (7 of 30 sampled, ADR-0008).
+   Needs a near-miss fixture first: a real test that lives in a `demo/` folder must still fire.
+5. **Vacuity shape: `if (await x.isVisible()) { …assertions… }`**, which lets a test skip its own
+   checks. Seen in a personal repo, not yet measured on the targets.
 
 A fixture-collision auditor is an idea with a precedent and no measurement. Say so if it comes up.

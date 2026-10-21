@@ -1,3 +1,5 @@
+import { renderContract } from './contract.mjs';
+
 /**
  * Moriarty — the adversarial pass.
  *
@@ -138,5 +140,5 @@ ${c.sharedSetup?.length
         // claim it read as corroboration when it was actually a hole in the evidence.
         : '\n⚠️ **This file contains no `beforeEach`/`Background` block** — so there is no shared setup to'
           + ' show, as opposed to some existing that was withheld. A premise established in a page object'
-          + ' or helper is still possible and still unverifiable here; that case is `downgraded`.\n'}`;
+          + ' or helper is still possible and still unverifiable here; that case is `downgraded`.\n'}${renderContract(c.contract)}`;
 }

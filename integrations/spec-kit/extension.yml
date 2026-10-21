@@ -1,0 +1,37 @@
+schema_version: "1.0"
+
+extension:
+  id: nightbark
+  name: "nightbark — tests that pass while proving nothing"
+  version: "0.1.0"
+  description: "Audit the tests an implementation produced: fixed waits, serialised suites, shared test identities, lying requirement links, and assertions whose premise was never established."
+  author: "JJ (Jacob) Badenhorst"
+  repository: https://github.com/badj/nightbark
+  license: MIT
+
+requires:
+  speckit_version: ">=1.0.0"
+
+provides:
+  commands:
+    - name: speckit.nightbark.audit
+      file: commands/speckit.nightbark.audit.md
+      description: "Run nightbark's deterministic gates over the project's tests and report what they found"
+    - name: speckit.nightbark.vacuity
+      file: commands/speckit.nightbark.vacuity.md
+      description: "Judge whether negative assertions prove anything, with the cited spec requirements as context, then attack every finding before reporting it"
+
+# after_implement, not "after converge": spec-kit v1.2.2 has no converge hook. implement and
+# converge alternate until "Converged", so this runs on every implement pass.
+hooks:
+  after_implement:
+    command: speckit.nightbark.audit
+    optional: true
+    prompt: "Audit the tests this implementation produced with nightbark?"
+    description: "Find tests that pass while proving nothing, before converge calls the feature done"
+
+tags:
+  - "testing"
+  - "playwright"
+  - "qa"
+  - "e2e"

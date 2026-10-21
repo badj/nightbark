@@ -1,3 +1,5 @@
+import { renderContract } from './contract.mjs';
+
 /**
  * Turn candidates into a brief — a prompt pack any agent can execute.
  *
@@ -75,6 +77,10 @@ Return **only** this JSON — an array, one entry per candidate, using the \`id\
 3. ⚠️ If the test's **name** promises something its body never checks, note it in \`evidence\` — but
    it does not change the \`premise\` verdict.
 4. Never invent an \`id\`. Only ids listed below exist.
+5. Where a candidate shows **requirements this test cites**, that is the contract it claims to cover.
+   If the assertion does not check what the requirement says, note it in \`evidence\` — like rule 3,
+   it does not change the \`premise\` verdict. An id defined in several features is ambiguous by
+   construction; name which one you think is meant, or say you cannot tell.
 
 ---
 
@@ -88,6 +94,7 @@ function renderCandidate(c, i) {
         : '\n_No shared setup found in this file._\n';
 
     const locs = (c.locators ?? []).length ? renderLocators(c.locators) : '';
+    const contract = renderContract(c.contract);
     return `## Candidate ${i + 1} — \`${c.id}\`
 
 - **kind:** ${c.kind}
@@ -106,7 +113,7 @@ ${c.assertionVerbatim && c.assertion !== c.assertionVerbatim ? `\n_Joined across
 \`\`\`
 ${clip(c.testBody, 80)}
 \`\`\`
-${setup}${locs}`;
+${setup}${locs}${contract}`;
 }
 
 /** Keep a block readable. A judge given an unbounded file drifts off the question it was asked. */

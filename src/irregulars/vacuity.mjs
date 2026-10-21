@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { walk, looksLikeTestCode } from '../runner.mjs';
 import { buildIndex, resolveLocator, locatorExpressions } from './locators.mjs';
+import { buildSpecIndex, contractFor, namedFeatures } from './contract.mjs';
 
 /**
  * The vacuity Irregular — candidate finder.
@@ -53,6 +54,8 @@ export function candidates(root, { max = 200, resolveLocators = true } = {}) {
     // One index for the whole run. Moriarty named withholding page objects as the biggest push
     // toward wrongly confirming a finding, so resolution is ON by default, not an opt-in.
     const index = resolveLocators ? buildIndex(root) : null;
+    // spec-kit requirements, if the repo has any. Empty otherwise, and then no candidate changes.
+    const specIndex = buildSpecIndex(root);
 
     for (const file of walk(root)) {
         let text;
@@ -63,6 +66,9 @@ export function candidates(root, { max = 200, resolveLocators = true } = {}) {
         const lines = text.split('\n');
         const blocks = isFeature ? gherkinBlocks(lines) : jsBlocks(lines);
         const shared = isFeature ? gherkinBackground(lines) : jsHooks(lines);
+        // Everything before the first test: where a file-level "covers FR-xxx" comment lives.
+        const header = lines.slice(0, blocks[0]?.start ?? lines.length);
+        const named = specIndex.size ? namedFeatures(text) : new Set();
 
         lines.forEach((line, i) => {
             if (/^\s*(?:\/\/|\*|#)/.test(line)) return;       // a commented assertion asserts nothing
@@ -86,6 +92,9 @@ export function candidates(root, { max = 200, resolveLocators = true } = {}) {
                     testBody: block ? lines.slice(block.start, block.end + 1) : [line],
                     sharedSetup: shared,
                     question: q,
+                    // What the test was SUPPOSED to prove, when it cites a spec-kit requirement. Every
+                    // definition of each id, not a guessed one: see contract.mjs for why (0 of 4).
+                    contract: contractFor(specIndex, block ? lines.slice(block.start, block.end + 1) : [line], header, named),
                     // The locator, traced to where it is DEFINED — plus every other place it is
                     // asserted on, which is what settles "is this selector even live?".
                     locators: index

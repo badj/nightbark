@@ -346,6 +346,26 @@ a known-broken fixture is worth far more than the bytes.
 
 `prepublishOnly` runs the full selftest, so a broken build cannot be published.
 
+## spec-kit — an extension, and the requirements as evidence
+
+In a [spec-kit](https://github.com/github/spec-kit) project, an agent writes numbered requirements
+(`FR-012`) before the code, and the tests cite them. nightbark uses that in two ways:
+
+```bash
+specify extension add --dev node_modules/@obvioapac/nightbark/integrations/spec-kit
+```
+
+- **The extension** adds `speckit.nightbark.audit` (the gates) and `speckit.nightbark.vacuity` (the
+  judged check, with Moriarty), and asks to run the audit after every `/speckit-implement`, before
+  converge can call the feature done. Verified against spec-kit v1.2.2.
+- **The vacuity brief** shows the judge the requirement a test cites, so it can say when a test
+  checks something other than the requirement it claims.
+
+⚠️ Not a gate, on measurement. spec-kit restarts requirement numbers in every feature, so a bare
+`FR-017` names nothing on its own. A coverage gate built on it was right on **0 of 4** hand-checked
+hits. The brief therefore shows every definition of an id and lets the judge decide.
+[ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md) has the numbers, including a 13-repo audit.
+
 ## `init` — what it scaffolds, and what it refuses
 
 `npm init playwright@latest` already gives you a project, maintained by the people who write
@@ -403,6 +423,7 @@ The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing d
 | [ADR-0004](docs/adr/0004-where-the-smarts-live.md) | Gates first; agents only where judgement is required |
 | [INTEGRATIONS](docs/INTEGRATIONS.md) | Emit SARIF / JUnit / exit codes — don't build connectors |
 | [ADR-0007](docs/adr/0007-triage-is-a-gate-with-a-brief.md) | Bug triage is a gate with a brief, not an agent with a prompt |
+| [ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md) | spec-kit requirements are context for the judge, not a gate |
 | [CONTRACTS](docs/CONTRACTS.md) | ⚠️ What each layer is verified against — and the one gap that is still open |
 
 ## Status
