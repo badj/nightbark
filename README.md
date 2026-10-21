@@ -161,7 +161,7 @@ nightbark audit <path> --sarif out.json  # SARIF 2.1.0 for CI annotation
 nightbark audit <path> --fail-on warning # exit policy: error (default) | warning | note | never
 nightbark selftest                     # prove every gate can fire, and is specific
 nightbark selfcheck                    # enforce ADR-0001 on this repo — no client content
-nightbark verdict <path> --answers a.json --verdicts v.json   # merge into findings + SARIF
+nightbark verdict <path> --answers a.json --verdicts v.json --fail-on warning  # merge into findings + SARIF
 npm run selftest                       # the above, plus the output-format tests
 ```
 
@@ -428,9 +428,11 @@ The reasoning lives in [`docs/adr/`](docs/adr/) — read these before changing d
 
 ## Status
 
-**Tier 1 complete** — 3 gates, 1 Irregular with an adversarial pass, SARIF, exit policy, and
-ADR-0001 enforced by a self-check. 95% precision across 493 files of four real repositories, every
-finding hand-triaged. See [docs/TIER-1.md](docs/TIER-1.md).
+**Tier 1 complete** ([docs/TIER-1.md](docs/TIER-1.md)). Today: 4 gates, 1 Irregular with an
+adversarial pass, SARIF, exit policy, ADR-0001 enforced by a self-check, and a spec-kit extension.
+Precision is measured per run, not carried forward: see [Precision](#precision) (2026-10-10, 1463
+files across 8 targets) and [ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md) (2026-10-21,
+13 spec-kit repos). The 95% / 493-file figure first reported here is **superseded, not extended**.
 
 ⚠️ One Tier-1 criterion is deliberately NOT met: it asked for four Irregulars, and one is shipped.
 Two of the four intended shapes were pushed from gate to agent by measurement, and a third
@@ -460,6 +462,11 @@ person stops reading and the one real finding dies with the noise.
 taken with earlier gate versions.** Mixing the two would have produced a number describing no
 version of the tool that ever existed — the precise failure this project warns about elsewhere, so
 the old 493-file figure is superseded rather than extended.
+
+A second, **separate** population was measured on 2026-10-21: 13 public spec-kit repos, 1009
+findings. `fixed-wait` on a seeded sample of 30, hand-checked: 22 real, with 7 of the 8 misses in one
+new class (pauses in demo/recording specs). It is not summed with the table below. Different repos,
+different day. Details in [ADR-0008](docs/adr/0008-spec-kit-is-context-not-a-gate.md).
 
 | Target | What it is | Files read | Findings |
 | --- | --- | --- | --- |
