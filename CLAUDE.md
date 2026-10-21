@@ -11,16 +11,17 @@ months, not for feature count.
 
 ---
 
-## ⚠️ Pushing needs a GitHub account switch
+## Pushing: `badj` only
 
-`badj` is authenticated in `gh` but is usually NOT the active account (that is
-`JJ-Badenhorst-MWNZ`, used for client work). Sequence:
+Since 2026-10-21, **`badj` is the active `gh` account and the only one used for pushes.** Do not
+switch to `JJ-Badenhorst-MWNZ`, before or after. If `gh auth status` shows another account active,
+switch to `badj` and leave it there:
 
 ```bash
-gh auth switch --user badj && git push && gh auth switch --user JJ-Badenhorst-MWNZ
+gh auth switch --user badj   # only if it is not already active
+git push
 ```
 
-**Switch back afterwards**, or client-repo operations start failing with confusing 404s.
 Commits use `-c user.name="JJ (Jacob) Badenhorst" -c user.email=jjbadenhorst@gmail.com`.
 
 ⚠️ **There is a second checkout at `~/Documents/GitHub/badj/nightbark`.** It was the original working
@@ -55,7 +56,7 @@ npm version patch --no-git-tag-version      # 1. or minor. Edits package.json on
 npm run selftest                            # 2. must be green
 git commit ...                              # 3. long WHY message: what changed since the last tag
 git tag v0.1.1                              #    tag = the exact code that version shipped
-gh auth switch --user badj && git push --follow-tags && gh auth switch --user JJ-Badenhorst-MWNZ
+git push --follow-tags                      #    as badj (see Pushing)
 npm publish                                 # 5. AUTHOR'S terminal — browser 2FA needs a TTY
 npm view @obvioapac/nightbark version       # 6. verify; can take ~3 min to appear
 ```
