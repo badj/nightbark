@@ -45,7 +45,7 @@ const KNOWN = {
     init: ['base-url', 'force'],
     brief: ['out'],
     challenge: ['out'],
-    verdict: ['answers', 'verdicts', 'sarif'],
+    verdict: ['answers', 'verdicts', 'sarif', 'fail-on'],
     'sink:ado': ['org', 'project', 'plan', 'case', 'suites', 'outcome', 'arm', 'diagnose'],
     triage: ['out', 'json', 'branch', 'commit', 'runner'],
     selftest: [], selfcheck: [], help: [], logo: [],
