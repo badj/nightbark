@@ -67,6 +67,8 @@ reused — so selftest before tagging, not after.
 
 **Tags:** `v0.1.0` = `89d2d28`, tagged after the fact; `npm pack` of that commit reproduces the
 registry shasum exactly (`d7c6448c…`, checked 2026-10-10).
+`v0.2.0` = `9641fc1`, published 2026-10-21 (93 files); installed from the registry into a scratch
+dir, `npx nightbark selftest` → 8 proofs, 0 failing, and `integrations/spec-kit/` is in the tarball.
 
 ---
 
