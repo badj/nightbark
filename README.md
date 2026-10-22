@@ -92,7 +92,6 @@ That is what this tool is for. A test that did not fail may be proving nothing
 `nightbark` goes looking for the ones that should have barked and didn't.
 ```
 
-
 ---
 
 ## The problem it exists for
@@ -150,6 +149,14 @@ What reaches a reader:
 That last row is deliberate. Silently dropping an unreviewed claim would make an *incomplete*
 adversarial pass indistinguishable from a clean one, which is the exact defect shape this tool is
 named after.
+
+---
+
+**Nightbark — how a test suite gets audited**
+
+![nightbark-how-a-test-suite-gets-audited.gif](images/nightbark-how-a-test-suite-gets-audited.gif)
+
+---
 
 ## Usage
 
