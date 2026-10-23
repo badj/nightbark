@@ -154,7 +154,7 @@ named after.
 
 **Nightbark — how a test suite gets audited**
 
-![nightbark-how-a-test-suite-gets-audited.gif](images/nightbark-how-a-test-suite-gets-audited.gif)
+![nightbark-how-a-test-suite-gets-audited.gif](https://raw.githubusercontent.com/badj/nightbark/main/images/nightbark-how-a-test-suite-gets-audited.gif)
 
 ---
 
