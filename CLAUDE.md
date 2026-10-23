@@ -55,7 +55,7 @@ changes imply a bigger one.
 npm version patch --no-git-tag-version      # 1. or minor. Edits package.json only
 npm run selftest                            # 2. must be green
 git commit ...                              # 3. long WHY message: what changed since the last tag
-git tag v0.1.1                              #    tag = the exact code that version shipped
+git tag -a v0.1.1 -m "v0.1.1"                #    ANNOTATED: --follow-tags skips plain tags
 git push --follow-tags                      #    as badj (see Pushing)
 npm publish                                 # 5. AUTHOR'S terminal — browser 2FA needs a TTY
 npm view @obvioapac/nightbark version       # 6. verify; can take ~3 min to appear
